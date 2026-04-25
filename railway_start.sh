@@ -1,11 +1,10 @@
 #!/bin/bash
 set -e
 
-# Run migrations
-python manage.py migrate --noinput
+# Default port if not provided
+PORT=${PORT:-8000}
 
-# Collect static files
+python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 
-# Start server
 exec gunicorn pos.wsgi:application --bind 0.0.0.0:$PORT
