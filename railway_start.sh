@@ -1,10 +1,11 @@
 #!/bin/bash
+set -e
 
-echo "Running database migrations..."
+# Run migrations
 python manage.py migrate --noinput
 
-echo "Collecting static files..."
+# Collect static files
 python manage.py collectstatic --noinput
 
-echo "Starting Gunicorn..."
-gunicorn pos.wsgi:application
+# Start server
+exec gunicorn pos.wsgi:application --bind 0.0.0.0:$PORT
