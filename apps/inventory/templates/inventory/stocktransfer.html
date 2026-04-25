@@ -1,0 +1,382 @@
+{% extends "inventory/inventory_base.html" %}
+
+{% block title %}Stock Transfers{% endblock %}
+
+{% block content %}
+<h2>Stock Transfers</h2>
+
+<!-- Error/Alert -->
+<div class="error" id="transfer-error" style="color:red; margin-bottom:1em; display:none;"></div>
+<div class="success" id="transfer-success" style="color:green; margin-bottom:1em; display:none;"></div>
+
+<!-- Filters -->
+<div class="filters" style="margin-bottom: 1em; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+    <select id="filter-product" style="flex:1; padding:8px; min-width:150px;">
+        <option value="">All Products</option>
+    </select>
+    <select id="filter-from-store" style="flex:1; padding:8px; min-width:150px;">
+        <option value="">From Store</option>
+    </select>
+    <select id="filter-to-store" style="flex:1; padding:8px; min-width:150px;">
+        <option value="">To Store</option>
+    </select>
+    <input type="date" id="filter-date-from" style="padding:8px;">
+    <input type="date" id="filter-date-to" style="padding:8px;">
+    <button id="apply-filters" style="background:#007bff; color:white; border:none; padding:8px 16px; border-radius:3px; cursor:pointer;">
+        Apply Filters
+    </button>
+    <button id="clear-filters" style="background:#6c757d; color:white; border:none; padding:8px 16px; border-radius:3px; cursor:pointer;">
+        Clear Filters
+    </button>
+</div>
+
+<!-- Stats Cards -->
+<div class="stats-cards" style="display:flex; gap:1em; margin-bottom:1em;">
+    <div class="card" style="padding:1em; background:#f0f0f0; border-radius:5px; flex:1; text-align:center;">
+        <div>Total Transfers</div>
+        <strong id="total-transfers">0</strong>
+    </div>
+    <div class="card" style="padding:1em; background:#f0f0f0; border-radius:5px; flex:1; text-align:center;">
+        <div>Total Quantity</div>
+        <strong id="total-quantity">0</strong>
+    </div>
+    <div class="card" style="padding:1em; background:#f0f0f0; border-radius:5px; flex:1; text-align:center;">
+        <div>Today</div>
+        <strong id="today-count">0</strong>
+    </div>
+</div>
+
+<!-- New Transfer Button -->
+<div style="margin-bottom:1em;">
+    <button id="new-transfer-btn" style="background:#28a745; color:white; border:none; padding:8px 16px; border-radius:3px; cursor:pointer;">
+        New Transfer
+    </button>
+</div>
+
+<!-- Transfer Table -->
+<div style="overflow-x:auto;">
+    <table border="1" style="width:100%; margin-top:1em; border-collapse:collapse;">
+        <thead>
+            <tr style="background:#f8f9fa;">
+                <th style="padding:10px; text-align:left;">Date</th>
+                <th style="padding:10px; text-align:left;">Product</th>
+                <th style="padding:10px; text-align:left;">SKU</th>
+                <th style="padding:10px; text-align:left;">From → To</th>
+                <th style="padding:10px; text-align:left;">Quantity</th>
+                <th style="padding:10px; text-align:left;">Performed By</th>
+                <th style="padding:10px; text-align:left;">Stock Info</th>
+                <th style="padding:10px; text-align:left;">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="transfer-list">
+            <tr>
+                <td colspan="8" style="text-align:center; padding:40px;">
+                    Loading transfers...
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+<div class="pagination" style="margin-top:1em; display:flex; justify-content:center; align-items:center; gap:10px;">
+    <button id="prev-page" style="padding:5px 15px; background:#6c757d; color:white; border:none; border-radius:3px; cursor:pointer;">Prev</button>
+    <span id="page-info" style="padding:5px 10px;">Page 1</span>
+    <button id="next-page" style="padding:5px 15px; background:#6c757d; color:white; border:none; border-radius:3px; cursor:pointer;">Next</button>
+</div>
+
+<!-- Transfer Modal -->
+<div id="transfer-modal" style="display:none; position:fixed; top:5%; left:50%; transform:translateX(-50%); background:#fff; border:1px solid #ccc; padding:2em; z-index:1001; width:90%; max-width:600px; border-radius:5px; box-shadow:0 4px 20px rgba(0,0,0,0.15);">
+    <h3 id="transfer-modal-title" style="margin-top:0; margin-bottom:1em;">New Transfer</h3>
+    <div class="form-error" id="transfer-form-error" style="color:red; margin-bottom:1em; display:none;"></div>
+    
+    <form id="transfer-form">
+        {% csrf_token %}
+        <div style="margin-bottom:1em;">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Product *</label>
+            <select id="transfer-product" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:3px;" required>
+                <option value="">Select Product</option>
+            </select>
+        </div>
+        
+        <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:1em; margin-bottom:1em;">
+            <div>
+                <label style="display:block; margin-bottom:5px; font-weight:bold;">From Store *</label>
+                <select id="transfer-from-store" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:3px;" required>
+                    <option value="">Select Store</option>
+                </select>
+            </div>
+            
+            <div>
+                <label style="display:block; margin-bottom:5px; font-weight:bold;">To Store *</label>
+                <select id="transfer-to-store" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:3px;" required>
+                    <option value="">Select Store</option>
+                </select>
+            </div>
+        </div>
+        
+        <div style="margin-bottom:1em;">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Quantity *</label>
+            <input type="number" id="transfer-quantity" value="1" min="1" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:3px;" required>
+        </div>
+        
+        <div style="margin-bottom:1em;">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Notes</label>
+            <textarea id="transfer-notes" rows="2" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:3px;"></textarea>
+        </div>
+
+        <!-- Stock Info -->
+        <div id="transfer-validation" style="margin-top:1em; margin-bottom:1em; display:none;"></div>
+        <div style="margin-top:1em; padding:10px; background:#f8f9fa; border-radius:3px;">
+            <div style="margin-bottom:5px;">
+                <strong>Source Store:</strong> 
+                <span id="source-current-stock">—</span> → After: <span id="source-after-transfer">—</span>
+            </div>
+            <div>
+                <strong>Destination Store:</strong> 
+                <span id="destination-current-stock">—</span> → After: <span id="destination-after-transfer">—</span>
+            </div>
+        </div>
+
+        <div style="margin-top:1em; display:flex; gap:10px;">
+            <button type="button" id="transfer-submit" style="background:#28a745; color:white; border:none; padding:8px 20px; border-radius:3px; cursor:pointer;">
+                Create Transfer
+            </button>
+            <button type="button" id="transfer-cancel" style="background:#6c757d; color:white; border:none; padding:8px 20px; border-radius:3px; cursor:pointer;">
+                Cancel
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Load JS -->
+{% load static %}
+<script src="{% static 'js/inventory/stocktransfer.js' %}?v=1.0"></script>
+
+<style>
+    /* Status badges */
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        display: inline-block;
+    }
+    
+    .status-completed {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .status-pending {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+    
+    .status-cancelled {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    /* Action buttons in table */
+    .btn-edit, .btn-delete {
+        padding: 4px 12px;
+        margin: 0 2px;
+        border-radius: 3px;
+        cursor: pointer;
+        border: none;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    
+    .btn-edit {
+        background: #007bff;
+        color: white;
+    }
+    
+    .btn-edit:hover {
+        background: #0056b3;
+    }
+    
+    .btn-delete {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .btn-delete:hover {
+        background: #c82333;
+    }
+    
+    /* Table styling */
+    table {
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+    
+    th {
+        background: #f8f9fa;
+        padding: 10px;
+        text-align: left;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    td {
+        padding: 8px 10px;
+        border-top: 1px solid #dee2e6;
+    }
+    
+    tr:hover {
+        background: #f8f9fa;
+    }
+    
+    /* Modal backdrop */
+    .modal-backdrop {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+    }
+    
+    .modal-backdrop.active {
+        display: block;
+    }
+    
+    /* Pagination button states */
+    button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    /* Validation messages */
+    .validation-message {
+        padding: 10px;
+        border-radius: 3px;
+        margin: 10px 0;
+    }
+    
+    .validation-message.success {
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+    }
+    
+    .validation-message.error {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+    }
+    
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .filters {
+            flex-direction: column;
+        }
+        
+        .stats-cards {
+            flex-direction: column;
+        }
+        
+        #transfer-modal {
+            width: 95%;
+            top: 2%;
+            padding: 1em;
+        }
+        
+        #transfer-modal > div {
+            grid-template-columns: 1fr;
+        }
+        
+        table {
+            font-size: 12px;
+        }
+        
+        .btn-edit, .btn-delete {
+            padding: 3px 8px;
+            margin: 1px;
+            font-size: 11px;
+        }
+    }
+</style>
+
+<script>
+// Modal backdrop functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize modal backdrop
+    function createBackdrop() {
+        let backdrop = document.querySelector('.modal-backdrop');
+        if (!backdrop) {
+            backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop';
+            backdrop.addEventListener('click', function() {
+                hideAllModals();
+            });
+            document.body.appendChild(backdrop);
+        }
+        return backdrop;
+    }
+    
+    // Show modal with backdrop
+    function showModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'block';
+            createBackdrop().classList.add('active');
+        }
+    }
+    
+    // Hide modal
+    function hideModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) {
+            backdrop.classList.remove('active');
+        }
+    }
+    
+    // Hide all modals
+    function hideAllModals() {
+        document.querySelectorAll('[id$="-modal"]').forEach(modal => {
+            modal.style.display = 'none';
+        });
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) {
+            backdrop.classList.remove('active');
+        }
+    }
+    
+    // Attach event listeners for modals (these will be overridden by TransferManager if it exists)
+    const newTransferBtn = document.getElementById('new-transfer-btn');
+    const transferCancelBtn = document.getElementById('transfer-cancel');
+    
+    if (newTransferBtn) {
+        newTransferBtn.addEventListener('click', function() {
+            showModal('transfer-modal');
+        });
+    }
+    
+    if (transferCancelBtn) {
+        transferCancelBtn.addEventListener('click', function() {
+            hideModal('transfer-modal');
+        });
+    }
+    
+    // Close modals with Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            hideAllModals();
+        }
+    });
+});
+</script>
+
+{% endblock %}

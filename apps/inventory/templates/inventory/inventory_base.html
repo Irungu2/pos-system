@@ -1,0 +1,362 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Inventory Management System">
+    
+    <!-- SEO & Performance Improvements -->
+    <title>{% block title %}Inventory Management System{% endblock %}</title>
+    
+    <!-- Preload Critical Resources -->
+    <link rel="preload" href="{% static 'css/base.css' %}" as="style">
+    <link rel="preload" href="{% static 'css/categories.css' %}" as="style">
+    
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="{% static 'css/base.css' %}?v={% now 'YmdHi' %}">
+    <link rel="stylesheet" href="{% static 'css/sidebar.css' %}?v={% now 'YmdHi' %}">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
+    
+    <!-- Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self'; 
+    script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; 
+    style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; 
+    font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+    ">
+    
+    <!-- Block for page-specific head content -->
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body class="{% if sidebar_collapsed %}sidebar-collapsed{% else %}sidebar-expanded{% endif %}">
+    <!-- Skip to main content for accessibility -->
+    <a href="#main-content" class="skip-to-content">Skip to main content</a>
+
+    <!-- Top Navigation Bar -->
+    <header class="topbar" role="banner">
+        <div class="logo" aria-label="Inventory System Home">
+            <a href="{% url 'inventory:admin' %}" class="logo-link">
+                <i class="fas fa-boxes"></i>
+                <span class="logo-text">Dashboad - Admin</span>
+            </a>
+        </div>
+        
+        <!-- Sidebar Toggle Button -->
+        <button id="sidebar-toggle" class="sidebar-toggle-btn" aria-label="Toggle sidebar" aria-expanded="true">
+            <i class="fas fa-bars"></i>
+        </button>
+        
+        <nav class="topbar-right" aria-label="Primary navigation">
+            <ul class="nav-list">
+                <li><a href="{% url 'dashboard' %}" class="nav-link"><i class="fas fa-home"></i> <span>Home</span></a></li>
+                <li><a href="{% url 'logout' %}" class="nav-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div class="main-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar" aria-label="Secondary navigation">
+            <div class="sidebar-header">
+                <h3 class="sidebar-title">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span class="sidebar-title-text">Navigation</span>
+                </h3>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <ul class="sidebar-menu">
+                    <li>
+                        <a href="{% url 'inventory:categories_ui' %}" class="sidebar-link" title="Categories">
+                            <i class="fas fa-tags"></i>
+                            <span class="sidebar-link-text">Categories</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'inventory:products_ui' %}" class="sidebar-link" title="Products">
+                            <i class="fas fa-box"></i>
+                            <span class="sidebar-link-text">Products</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'inventory:stores_ui' %}" class="sidebar-link" title="Stores">
+                            <i class="fas fa-store"></i>
+                            <span class="sidebar-link-text">Stores</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'inventory:store_stocks_ui' %}" class="sidebar-link" title="Stocks">
+                            <i class="fas fa-warehouse"></i>
+                            <span class="sidebar-link-text">Stocks</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'inventory:stock_transfers_ui' %}" class="sidebar-link" title="Stock Transfer">
+                            <i class="fas fa-truck-moving"></i>
+                            <span class="sidebar-link-text">Stock Transfer</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'inventory:stock_transactions_ui' %}" class="sidebar-link" title="Stock Management">
+                            <i class="fas fa-exchange-alt"></i>
+                            <span class="sidebar-link-text">Transaction History</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'inventory:inventory-summary' %}" class="sidebar-link" title="Summary">
+                            <i class="fas fa-chart-bar"></i>
+                            <span class="sidebar-link-text">Summary</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'inventory:reports' %}" class="sidebar-link" title="Reports">
+                            <i class="fas fa-file-alt"></i>
+                            <span class="sidebar-link-text">Reports</span>
+                        </a>
+                    </li>
+
+
+                    <li>
+                        <a href="{% url 'user_list' %}" class="sidebar-link" title="User Management">
+                            <i class="fas fa-users"></i>
+                            <span class="sidebar-link-text">User Management</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'sales_dashboard' %}" class="sidebar-link" title="Sales">
+                            <i class="fas fa-shopping-cart"></i>
+                            <span class="sidebar-link-text">Sales</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <i class="fas fa-user-circle"></i>
+                    <span class="sidebar-user-name">
+                        {% if user.is_authenticated %}
+                            {{ user.username }}
+                        {% else %}
+                            Guest
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main id="main-content" class="content" role="main">
+            <!-- Page-specific content -->
+            {% block content %}
+            {% endblock %}
+            
+            <!-- Messages/Notifications -->
+            {% if messages %}
+            <div class="messages-container">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}" role="alert">
+                    <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
+                    {{ message }}
+                    <button class="alert-close" aria-label="Close message">&times;</button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer" role="contentinfo">
+        <p>&copy; <span id="current-year">{{ year|default:"2025" }}</span> Vision Heritage - Hinse Management System</p>
+        <p class="footer-status">
+            <i class="fas fa-circle sidebar-status-icon"></i>
+            <span class="sidebar-status-text">Sidebar: <span id="sidebar-status">Expanded</span></span>
+        </p>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Initialize sidebar state from localStorage or default to expanded
+        const savedSidebarState = localStorage.getItem('sidebarCollapsed');
+        const isCollapsed = savedSidebarState ? JSON.parse(savedSidebarState) : false;
+        
+        // Set initial state
+        if (isCollapsed) {
+            document.body.classList.add('sidebar-collapsed');
+            document.body.classList.remove('sidebar-expanded');
+            updateSidebarStatus();
+        }
+        
+        // Update current year in footer
+        document.getElementById('current-year').textContent = new Date().getFullYear();
+        
+        // Toggle sidebar function
+        function toggleSidebar() {
+            const body = document.body;
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('sidebar-toggle');
+            const icon = toggleBtn.querySelector('i');
+            
+            body.classList.toggle('sidebar-collapsed');
+            body.classList.toggle('sidebar-expanded');
+            sidebar.classList.toggle('collapsed');
+            
+            // Update toggle button icon and aria-label
+            const isCollapsed = body.classList.contains('sidebar-collapsed');
+            if (isCollapsed) {
+                icon.className = 'fas fa-chevron-right';
+                toggleBtn.setAttribute('aria-expanded', 'false');
+                toggleBtn.setAttribute('aria-label', 'Expand sidebar');
+            } else {
+                icon.className = 'fas fa-bars';
+                toggleBtn.setAttribute('aria-expanded', 'true');
+                toggleBtn.setAttribute('aria-label', 'Collapse sidebar');
+            }
+            
+            // Save state to localStorage
+            localStorage.setItem('sidebarCollapsed', isCollapsed);
+            
+            // Update status in footer
+            updateSidebarStatus();
+            
+            // Dispatch custom event for other scripts to listen to
+            const event = new CustomEvent('sidebarToggle', { detail: { collapsed: isCollapsed } });
+            window.dispatchEvent(event);
+        }
+        
+        // Update sidebar status text
+        function updateSidebarStatus() {
+            const statusElement = document.getElementById('sidebar-status');
+            const isCollapsed = document.body.classList.contains('sidebar-collapsed');
+            statusElement.textContent = isCollapsed ? 'Collapsed' : 'Expanded';
+        }
+        
+        // Add aria-current for active navigation
+        function setActiveNavigation() {
+            const currentPath = window.location.pathname;
+            const navLinks = document.querySelectorAll('.nav-link, .sidebar-link');
+            
+            navLinks.forEach(link => {
+                // Remove any existing active classes
+                link.classList.remove('active');
+                
+                // Check if this link's href matches current path
+                const linkPath = link.getAttribute('href');
+                if (linkPath === currentPath) {
+                    link.classList.add('active');
+                    link.setAttribute('aria-current', 'page');
+                }
+            });
+        }
+        
+        // Close alert messages
+        function setupAlertCloseButtons() {
+            document.querySelectorAll('.alert-close').forEach(button => {
+                button.addEventListener('click', function() {
+                    this.parentElement.style.display = 'none';
+                });
+            });
+        }
+        
+        // Keyboard shortcuts
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', function(e) {
+                // Ctrl+B or Cmd+B to toggle sidebar
+                if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                    e.preventDefault();
+                    toggleSidebar();
+                }
+                
+                // Escape key to collapse sidebar
+                if (e.key === 'Escape' && window.innerWidth < 768) {
+                    if (!document.body.classList.contains('sidebar-collapsed')) {
+                        toggleSidebar();
+                    }
+                }
+            });
+        }
+        
+        // Responsive sidebar behavior
+        function handleResponsiveSidebar() {
+            const mediaQuery = window.matchMedia('(max-width: 768px)');
+            
+            function handleTabletChange(e) {
+                if (e.matches) {
+                    // On mobile/tablet, collapse sidebar by default
+                    if (!document.body.classList.contains('sidebar-collapsed')) {
+                        toggleSidebar();
+                    }
+                } else {
+                    // On desktop, restore saved state
+                    const savedState = localStorage.getItem('sidebarCollapsed');
+                    if (savedState === 'true' && !document.body.classList.contains('sidebar-collapsed')) {
+                        toggleSidebar();
+                    } else if (savedState === 'false' && document.body.classList.contains('sidebar-collapsed')) {
+                        toggleSidebar();
+                    }
+                }
+            }
+            
+            // Initial check
+            handleTabletChange(mediaQuery);
+            
+            // Add listener for changes
+            mediaQuery.addListener(handleTabletChange);
+        }
+        
+        // Initialize everything when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up sidebar toggle button
+            const toggleBtn = document.getElementById('sidebar-toggle');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', toggleSidebar);
+                
+                // Set initial aria attributes
+                const isCollapsed = document.body.classList.contains('sidebar-collapsed');
+                toggleBtn.setAttribute('aria-expanded', !isCollapsed);
+                toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+            }
+            
+            // Set active navigation
+            setActiveNavigation();
+            
+            // Setup alert close buttons
+            setupAlertCloseButtons();
+            
+            // Setup keyboard shortcuts
+            setupKeyboardShortcuts();
+            
+            // Handle responsive sidebar
+            handleResponsiveSidebar();
+            
+            // Close sidebar when clicking outside on mobile
+            document.addEventListener('click', function(e) {
+                const sidebar = document.getElementById('sidebar');
+                const toggleBtn = document.getElementById('sidebar-toggle');
+                
+                if (window.innerWidth < 768 && 
+                    !sidebar.contains(e.target) && 
+                    !toggleBtn.contains(e.target) &&
+                    !document.body.classList.contains('sidebar-collapsed')) {
+                    toggleSidebar();
+                }
+            });
+        });
+        
+        // Expose toggle function globally for potential use in other scripts
+        window.toggleSidebar = toggleSidebar;
+    </script>
+    
+    <!-- Block for page-specific scripts -->
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

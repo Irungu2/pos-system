@@ -1,0 +1,25 @@
+{% extends "inventory/inventory_base.html" %}
+
+
+{% block title %}Categories{% endblock %}
+
+{% block content %}
+<h2>Categories</h2>
+
+<div class="error" id="error"></div>
+
+<div>
+    <input type="text" id="category-name" placeholder="Category Name">
+    <input type="text" id="category-description" placeholder="Description">
+    <button id="submit-btn">Add Category</button>
+    <button id="cancel-btn" style="display:none;">Cancel</button>
+</div>
+
+<ul id="category-list"></ul>
+
+
+  {% load static %}
+<script src="{% static 'js/inventory/category.js' %}?v=1"></script>
+
+{% endblock %}
+

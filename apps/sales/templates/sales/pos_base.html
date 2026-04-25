@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block title %}Point of Sale{% endblock %}
+
+{% block content %}
+<div class="h-screen flex flex-col bg-gray-50">
+    
+    {% include 'sales/pos_header.html' %}
+    
+    <div class="flex-1 flex overflow-hidden">
+        <!-- Products Panel -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            {% include 'sales/pos_search_bar.html' %}
+
+            <!-- Products Grid -->
+            <div id="products-grid" class="grid grid-cols-4 gap-4 p-4 overflow-auto flex-1 bg-gray-50">
+                <!-- Products will be injected here by pos.js -->
+            </div>
+        </div>
+
+        <!-- Cart Panel -->
+        {% include 'sales/pos_cart_panel.html' %}
+    </div>
+</div>
+
+<!-- Include JavaScript -->
+<script src="{% static 'js/pos_cart.js' %}?v=1"></script>
+<script src="{% static 'js/pos_receipt.js' %}?v=1"></script>
+<script src="{% static 'js/pos24.js' %}?v=1"></script>
+
+<style>
+.hidden { display: none !important; }
+
+.product-card { 
+    transition: all 0.2s ease-in-out; 
+}
+.product-card:hover { 
+    transform: translateY(-2px); 
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); 
+}
+.quantity-btn { 
+    transition: all 0.2s ease; 
+}
+.quantity-btn:hover { 
+    transform: scale(1.1); 
+}
+.animate-spin { 
+    animation: spin 1s linear infinite; 
+}
+@keyframes spin { 
+    0% { transform: rotate(0deg); } 
+    100% { transform: rotate(360deg); } 
+}
+</style>
+{% endblock %}

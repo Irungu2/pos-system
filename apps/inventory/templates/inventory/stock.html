@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Stock Management</h2>
+
+<form id="stock-form">
+    <input type="hidden" name="id">
+    <label>Store: 
+        <select name="store">
+            <option value="">--Select--</option>
+            {% for store in stores %}
+                <option value="{{ store.id }}">{{ store.name }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <label>Product:
+        <select name="product">
+            <option value="">--Select--</option>
+            {% for prod in products %}
+                <option value="{{ prod.id }}">{{ prod.name }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <label>Quantity: <input type="number" name="quantity" min="0" required></label>
+    <button type="submit">Save</button>
+</form>
+
+<table border="1" width="100%">
+    <thead>
+        <tr>
+            <th>ID</th><th>Store</th><th>Product</th><th>Quantity</th><th>Actions</th>
+        </tr>
+    </thead>
+    <tbody id="stock-table-body"></tbody>
+</table>
+{% endblock %}

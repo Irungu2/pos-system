@@ -1,0 +1,943 @@
+{% extends "inventory/inventory_base.html" %}
+
+{% load static %}
+
+{% block title %}Reports - Inventory Management System{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="{% static 'css/reports.css' %}?v={% now 'YmdHi' %}">
+<style>
+    /* Inline styles for critical rendering */
+    :root {
+        --primary-color: #4361ee;
+        --secondary-color: #3a0ca3;
+        --success-color: #4cc9f0;
+        --danger-color: #f72585;
+        --warning-color: #f8961e;
+        --info-color: #7209b7;
+        --light-color: #f8f9fa;
+        --dark-color: #212529;
+        --border-color: #dee2e6;
+        --shadow-color: rgba(0, 0, 0, 0.1);
+    }
+    
+    .reports-container {
+        min-height: calc(100vh - 200px);
+        padding: 20px;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    }
+    
+    .report-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px var(--shadow-color);
+        border: none;
+        margin-bottom: 25px;
+        overflow: visible;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .report-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    }
+    
+    .card-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        padding: 20px;
+        border-bottom: none;
+        font-weight: 600;
+        font-size: 1.25rem;
+    }
+    
+    .card-header i {
+        margin-right: 10px;
+    }
+    
+    .card-body {
+        padding: 30px;
+        overflow: visible;
+    }
+    
+    .filter-group {
+        margin-bottom: 25px;
+    }
+    
+    .filter-label {
+        font-weight: 600;
+        color: var(--dark-color);
+        margin-bottom: 8px;
+        display: block;
+        font-size: 0.95rem;
+    }
+    
+    .form-control, .form-select {
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        padding: 10px 15px;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.25);
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        border: none;
+        border-radius: 8px;
+        padding: 12px 30px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(67, 97, 238, 0.3);
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(67, 97, 238, 0.4);
+        background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+    }
+    
+    .btn-primary:disabled {
+        background: #6c757d;
+        transform: none;
+        box-shadow: none;
+    }
+    
+    .btn-outline-primary {
+        border: 2px solid var(--primary-color);
+        color: var(--primary-color);
+        border-radius: 8px;
+        padding: 8px 20px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: var(--primary-color);
+        color: white;
+        transform: translateY(-2px);
+    }
+    
+    .quick-reports {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 30px;
+    }
+    
+    .quick-report-btn {
+        flex: 1;
+        min-width: 120px;
+        background: white;
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        padding: 12px;
+        font-weight: 500;
+        color: var(--dark-color);
+        transition: all 0.3s ease;
+        cursor: pointer;
+        text-align: center;
+    }
+    
+    .quick-report-btn:hover {
+        background-color: var(--primary-color);
+        color: white;
+        border-color: var(--primary-color);
+        transform: translateY(-2px);
+    }
+    
+    .summary-card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        border-left: 5px solid var(--primary-color);
+        box-shadow: 0 2px 10px var(--shadow-color);
+        transition: all 0.3s ease;
+        height: 100%;
+    }
+    
+    .summary-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    .summary-card h4 {
+        color: var(--primary-color);
+        margin-bottom: 10px;
+        font-weight: 700;
+        font-size: 1.5rem;
+    }
+    
+    .summary-card h6 {
+        color: #6c757d;
+        font-size: 0.9rem;
+        margin-bottom: 5px;
+    }
+    
+    .summary-card small {
+        color: #adb5bd;
+        font-size: 0.8rem;
+    }
+    
+    .table-responsive {
+        border-radius: 10px;
+        overflow-x: auto;
+        overflow-y: visible;
+        box-shadow: 0 2px 10px var(--shadow-color);
+    }
+    
+    .table {
+        margin-bottom: 0;
+        width: 100%;
+        min-width: 600px;
+    }
+    
+    .table th {
+        background-color: var(--primary-color);
+        color: white;
+        font-weight: 600;
+        border: none;
+        padding: 15px;
+        white-space: nowrap;
+    }
+    
+    .table td {
+        padding: 12px 15px;
+        vertical-align: middle;
+        border-color: #e9ecef;
+    }
+    
+    .table tbody tr:hover {
+        background-color: rgba(67, 97, 238, 0.05);
+    }
+    
+    .badge {
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-weight: 500;
+        font-size: 0.8rem;
+    }
+    
+    .nav-tabs {
+        border-bottom: 2px solid #dee2e6;
+        margin-bottom: 20px;
+    }
+    
+    .nav-tabs .nav-link {
+        border: none;
+        color: #6c757d;
+        font-weight: 500;
+        padding: 10px 20px;
+        border-radius: 8px 8px 0 0;
+        margin-right: 5px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .nav-tabs .nav-link.active {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+    }
+    
+    .nav-tabs .nav-link:hover:not(.active) {
+        background-color: rgba(67, 97, 238, 0.1);
+        color: var(--primary-color);
+    }
+    
+    .loading-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 10px;
+        margin: 20px 0;
+        box-shadow: 0 2px 10px var(--shadow-color);
+    }
+    
+    .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .pre-code {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 20px;
+        max-height: 500px;
+        overflow-y: auto;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9rem;
+        line-height: 1.5;
+    }
+    
+    .pre-code pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 0;
+    }
+    
+    /* Print Styles */
+    @media print {
+        .reports-container {
+            padding: 0;
+            background: white;
+        }
+        
+        .report-card {
+            box-shadow: none;
+            break-inside: avoid;
+        }
+        
+        .report-card:hover {
+            transform: none;
+        }
+        
+        .quick-reports,
+        .filter-group:not(.no-print),
+        #generateBtn,
+        .action-buttons,
+        .nav-tabs,
+        .loading-indicator,
+        .report-card.mt-4,
+        .last-updated {
+            display: none !important;
+        }
+        
+        .tab-pane {
+            display: block !important;
+            padding-top: 0;
+        }
+        
+        .tab-pane.fade {
+            opacity: 1 !important;
+        }
+        
+        .d-none {
+            display: block !important;
+        }
+        
+        #reportResult {
+            display: block !important;
+        }
+        
+        .table-responsive {
+            overflow: visible !important;
+        }
+        
+        .table {
+            width: 100% !important;
+        }
+        
+        .summary-card {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+        
+        .card-header {
+            background: #4361ee !important;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
+        
+        .table th {
+            background: #4361ee !important;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .reports-container {
+            padding: 15px;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        .quick-reports {
+            flex-direction: column;
+        }
+        
+        .quick-report-btn {
+            min-width: 100%;
+        }
+        
+        .action-buttons {
+            flex-direction: column;
+        }
+        
+        .action-buttons .btn {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        
+        .table th, .table td {
+            padding: 8px 10px;
+            font-size: 12px;
+        }
+    }
+    
+    .highlight {
+        background-color: rgba(76, 201, 240, 0.1);
+        padding: 2px 5px;
+        border-radius: 3px;
+        border-left: 3px solid var(--success-color);
+    }
+    
+    .error-message {
+        background-color: rgba(247, 37, 133, 0.1);
+        border-left: 3px solid var(--danger-color);
+        color: var(--danger-color);
+        padding: 15px;
+        border-radius: 5px;
+        margin: 15px 0;
+        display: none;
+    }
+    
+    .tab-pane {
+        padding-top: 20px;
+    }
+    
+    /* Ensure all content is visible */
+    .row {
+        display: flex;
+        flex-wrap: wrap;
+        margin-right: -15px;
+        margin-left: -15px;
+    }
+    
+    .col-md-3, .col-sm-6 {
+        position: relative;
+        width: 100%;
+        padding-right: 15px;
+        padding-left: 15px;
+    }
+    
+    @media (min-width: 768px) {
+        .col-md-3 {
+            flex: 0 0 25%;
+            max-width: 25%;
+        }
+    }
+    
+    @media (min-width: 576px) {
+        .col-sm-6 {
+            flex: 0 0 50%;
+            max-width: 50%;
+        }
+    }
+    
+    /* Fix for hidden overflow */
+    .overflow-visible {
+        overflow: visible !important;
+    }
+    
+    .table-fixed {
+    table-layout: fixed;
+    }
+    
+    .table-wrap {
+    overflow-x: auto;
+    max-width: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="reports-container">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="page-title">
+                        <i class="fas fa-chart-line me-3"></i>
+                        Sales Reports & Analytics
+                    </h1>
+                    <p class="text-muted">Generate detailed reports and analyze your sales performance</p>
+                </div>
+                <div class="last-updated">
+                    <small class="text-muted">
+                        <i class="fas fa-clock me-1"></i>
+                        Last updated: <span id="lastUpdated">{% now "F j, Y, g:i a" %}</span>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Reports Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="report-card">
+                <div class="card-header">
+                    <i class="fas fa-bolt"></i> Quick Reports
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">Get instant insights with one-click reports:</p>
+                    <div class="quick-reports">
+                        <button class="quick-report-btn" data-quick-report="today">
+                            <i class="fas fa-calendar-day me-2"></i>Today's Sales
+                        </button>
+                        <button class="quick-report-btn" data-quick-report="yesterday">
+                            <i class="fas fa-calendar-check me-2"></i>Yesterday's Summary
+                        </button>
+                        <button class="quick-report-btn" data-quick-report="last7">
+                            <i class="fas fa-chart-line me-2"></i>Last 7 Days
+                        </button>
+                        <button class="quick-report-btn" data-quick-report="last30">
+                            <i class="fas fa-calendar-alt me-2"></i>Last 30 Days
+                        </button>
+                        <button class="quick-report-btn" data-quick-report="lowstock">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Low Stock Alert
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Report Filters -->
+    <div class="row">
+        <div class="col-lg-4">
+            <div class="report-card">
+                <div class="card-header">
+                    <i class="fas fa-sliders-h"></i> Report Filters
+                </div>
+                <div class="card-body">
+                    <!-- Error Display Area -->
+                    <div id="error" class="error-message" role="alert"></div>
+
+                    <!-- Report Type -->
+                    <div class="filter-group">
+                        <label class="filter-label" for="reportType">
+                            <i class="fas fa-file-alt me-1"></i> Report Type
+                        </label>
+                        <select class="form-select" id="reportType" aria-label="Select report type">
+                            <option value="SALES_SUMMARY">Sales Summary</option>
+                            <option value="PRODUCT_SALES">Product Performance</option>
+                            <option value="CASHIER_PERFORMANCE">Cashier Performance</option>
+                            <option value="END_OF_DAY">End of Day Report</option>
+                            <option value="SALES_VS_STOCK">Sales vs Stock Analysis</option>
+                            <option value="TRANSACTION_DETAILS">Transaction Details</option>
+                        </select>
+                    </div>
+
+                    <!-- Date Range -->
+                    <div class="row">
+                        <div class="col-md-6 filter-group">
+                            <label class="filter-label" for="startDate">
+                                <i class="fas fa-calendar-start me-1"></i> Start Date
+                            </label>
+                            <input type="date" class="form-control" id="startDate">
+                        </div>
+                        <div class="col-md-6 filter-group">
+                            <label class="filter-label" for="endDate">
+                                <i class="fas fa-calendar-end me-1"></i> End Date
+                            </label>
+                            <input type="date" class="form-control" id="endDate">
+                        </div>
+                    </div>
+
+                    <!-- Report Specific Filters (Conditional) -->
+                    <div id="reportSpecificFilters" class="filter-group d-none">
+                        <div id="groupByFilter" class="filter-group" style="display: none;">
+                            <label class="filter-label" for="groupBy">
+                                <i class="fas fa-layer-group me-1"></i> Group By
+                            </label>
+                            <select class="form-select" id="groupBy" aria-label="Select grouping">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="quarterly">Quarterly</option>
+                                <option value="yearly">Yearly</option>
+                            </select>
+                        </div>
+                        
+                        <div id="topNFilter" class="filter-group" style="display: none;">
+                            <label class="filter-label" for="topN">
+                                <i class="fas fa-sort-numeric-down me-1"></i> Show Top N Results
+                            </label>
+                            <select class="form-select" id="topN" aria-label="Select number of results">
+                                <option value="10">Top 10</option>
+                                <option value="20" selected>Top 20</option>
+                                <option value="50">Top 50</option>
+                                <option value="100">Top 100</option>
+                            </select>
+                        </div>
+                        
+                        <div id="singleDateFilter" class="filter-group" style="display: none;">
+                            <label class="filter-label" for="reportDate">
+                                <i class="fas fa-calendar-day me-1"></i> Report Date
+                            </label>
+                            <input type="date" class="form-control" id="reportDate">
+                        </div>
+                    </div>
+
+                    <!-- Additional Filters -->
+                    <div class="filter-group">
+                        <label class="filter-label" for="store">
+                            <i class="fas fa-store me-1"></i> Store (Optional)
+                        </label>
+                        <select class="form-select" id="store" aria-label="Select store">
+                            <option value="">All Stores</option>
+                            {% for store in stores %}
+                            <option value="{{ store.id }}">{{ store.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="filter-label" for="cashier">
+                            <i class="fas fa-user-tie me-1"></i> Cashier (Optional)
+                        </label>
+                        <select class="form-select" id="cashier" aria-label="Select cashier">
+                            <option value="">All Cashiers</option>
+                            {% for cashier in cashiers %}
+                            <option value="{{ cashier.id }}">{{ cashier.get_full_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="filter-label" for="product">
+                            <i class="fas fa-box me-1"></i> Product (Optional)
+                        </label>
+                        <select class="form-select" id="product" aria-label="Select product">
+                            <option value="">All Products</option>
+                            {% for product in products %}
+                            <option value="{{ product.id }}">{{ product.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="filter-label" for="category">
+                            <i class="fas fa-tags me-1"></i> Category (Optional)
+                        </label>
+                        <select class="form-select" id="category" aria-label="Select category">
+                            <option value="">All Categories</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Generate Button -->
+                    <div class="d-grid gap-2 mt-4">
+                        <button id="generateBtn" class="btn btn-primary btn-lg">
+                            <i class="fas fa-play-circle me-2"></i>
+                            Generate Report
+                        </button>
+                    </div>
+
+                    <!-- Loading Indicator -->
+                    <div id="loadingIndicator" class="loading-indicator d-none">
+                        <div class="loading-spinner"></div>
+                        <div>
+                            <p class="mb-1">Generating Report...</p>
+                            <small class="text-muted">Please wait while we process your request</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Report Results Area -->
+        <div class="col-lg-8">
+            <div id="reportResult" class="report-card d-none">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-file-alt me-2"></i>
+                        <span id="reportTitle">Report Results</span>
+                    </div>
+                    <div class="action-buttons">
+                        <button id="exportBtn" class="btn btn-outline-primary btn-sm" disabled>
+                            <i class="fas fa-download me-1"></i> Export
+                        </button>
+                        <button id="printReportBtn" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-print me-1"></i> Print
+                        </button>
+                        <button id="copyReportBtn" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-copy me-1"></i> Copy
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="card-body overflow-visible">
+                    <!-- Report Metadata -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <small class="text-muted">
+                                <i class="fas fa-calendar me-1"></i>
+                                Period: <span id="reportPeriod">N/A</span>
+                            </small>
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>
+                                Generated: <span id="generatedAt">{% now "F j, Y, g:i a" %}</span>
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Report Tabs Navigation -->
+                    <ul class="nav nav-tabs" id="reportTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="data-tab" data-bs-toggle="tab" data-bs-target="#dataTab" type="button" role="tab" aria-controls="dataTab" aria-selected="true">
+                                <i class="fas fa-table me-1"></i> Data View
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="json-tab" data-bs-toggle="tab" data-bs-target="#jsonTab" type="button" role="tab" aria-controls="jsonTab" aria-selected="false">
+                                <i class="fas fa-code me-1"></i> JSON View
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="charts-tab" data-bs-toggle="tab" data-bs-target="#chartsTab" type="button" role="tab" aria-controls="chartsTab" aria-selected="false">
+                                <i class="fas fa-chart-bar me-1"></i> Charts View
+                            </button>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Contents -->
+                    <div class="tab-content" id="reportTabContent">
+                        <!-- Data Tab -->
+                        <div class="tab-pane fade show active" id="dataTab" role="tabpanel" aria-labelledby="data-tab">
+                            <!-- Summary Cards -->
+                            <div class="row mb-4" id="summaryCards">
+                                <!-- Summary cards will be dynamically inserted here -->
+                            </div>
+
+                            <!-- Data Table -->
+                            <div class="table-wrap">
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead id="reportTableHead">
+                                            <!-- Table headers will be dynamically inserted here -->
+                                        </thead>
+                                        <tbody id="reportTableBody">
+                                            <!-- Table rows will be dynamically inserted here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- JSON Tab -->
+                        <div class="tab-pane fade" id="jsonTab" role="tabpanel" aria-labelledby="json-tab">
+                            <div class="pre-code">
+                                <pre id="reportOutput" class="mb-0"></pre>
+                            </div>
+                        </div>
+
+                        <!-- Charts Tab -->
+                        <div class="tab-pane fade" id="chartsTab" role="tabpanel" aria-labelledby="charts-tab">
+                            <div class="text-center py-5">
+                                <i class="fas fa-chart-pie fa-3x text-muted mb-3"></i>
+                                <h5 class="text-muted">Charts Coming Soon</h5>
+                                <p class="text-muted">Interactive charts and visualizations will be available in the next update.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Help/Instructions Card -->
+            <div class="report-card mt-4">
+                <div class="card-header">
+                    <i class="fas fa-question-circle"></i> How to Use This Tool
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-lightbulb text-warning me-2"></i>Quick Tips:</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success me-2"></i> Use quick reports for common insights</li>
+                                <li><i class="fas fa-check text-success me-2"></i> Filter by date range for specific periods</li>
+                                <li><i class="fas fa-check text-success me-2"></i> Export results for offline analysis</li>
+                                <li><i class="fas fa-check text-success me-2"></i> Switch between Data and JSON views</li>
+                                <li><i class="fas fa-print text-primary me-2"></i> Click Print for a clean printable version</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-info-circle text-primary me-2"></i>Report Types:</h6>
+                            <ul class="list-unstyled">
+                                <li><span class="highlight">Sales Summary</span>: Daily/weekly/monthly trends</li>
+                                <li><span class="highlight">Product Performance</span>: Top-selling products</li>
+                                <li><span class="highlight">Cashier Performance</span>: Sales by cashier</li>
+                                <li><span class="highlight">End of Day</span>: Daily closing reports</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- Include the structured reports.js -->
+<script src="{% static 'js/reports/report23.js' %}?v={% now 'YmdHi' %}"></script>
+
+<script>
+    // Update last updated timestamp
+    function updateLastUpdated() {
+        const now = new Date();
+        const formatted = now.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        const lastUpdatedSpan = document.getElementById('lastUpdated');
+        if (lastUpdatedSpan) {
+            lastUpdatedSpan.textContent = formatted;
+        }
+    }
+    
+    // Initialize on DOM load
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('🚀 DOM loaded, initializing page...');
+        
+        updateLastUpdated();
+        
+        // Update timestamp every minute
+        setInterval(updateLastUpdated, 60000);
+        
+        // Set default dates
+        const today = new Date().toISOString().split('T')[0];
+        const startDate = document.getElementById('startDate');
+        const endDate = document.getElementById('endDate');
+        const reportDate = document.getElementById('reportDate');
+        
+        if (startDate) startDate.value = today;
+        if (endDate) endDate.value = today;
+        if (reportDate) reportDate.value = today;
+        
+        // Initialize Bootstrap tooltips if Bootstrap is available
+        if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        }
+        
+        // Add smooth scrolling for anchors
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+        
+        console.log('✅ Page initialization complete');
+        console.log('💡 Tabs are handled by Bootstrap 5');
+        console.log('🖨️ Print button will generate a clean printable document');
+    });
+    
+    // Print functionality - opens print dialog for the report
+    function printReport() {
+        const reportElement = document.getElementById('reportResult');
+        if (!reportElement || reportElement.classList.contains('d-none')) {
+            alert('No report to print. Please generate a report first.');
+            return;
+        }
+        
+        // Get the report content
+        const originalTitle = document.title;
+        document.title = document.getElementById('reportTitle').innerText;
+        
+        // Print the page (CSS media print handles the styling)
+        window.print();
+        
+        // Restore title
+        document.title = originalTitle;
+    }
+    
+    // Attach print button event if not already handled by ReportsController
+    document.addEventListener('DOMContentLoaded', function() {
+        const printBtn = document.getElementById('printReportBtn');
+        if (printBtn && !printBtn.hasAttribute('data-listener')) {
+            printBtn.setAttribute('data-listener', 'true');
+            // The ReportsController will handle this, but this is a fallback
+        }
+    });
+    
+    // Keyboard shortcuts for reports
+    document.addEventListener('keydown', function(e) {
+        // Ctrl+G to generate report
+        if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
+            e.preventDefault();
+            const generateBtn = document.getElementById('generateBtn');
+            if (generateBtn && !generateBtn.disabled) {
+                generateBtn.click();
+            }
+        }
+        
+        // Ctrl+P for print
+        if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+            e.preventDefault();
+            const printBtn = document.getElementById('printReportBtn');
+            if (printBtn) {
+                printBtn.click();
+            }
+        }
+        
+        // Ctrl+T to toggle between tabs (using Bootstrap tabs API)
+        if ((e.ctrlKey || e.metaKey) && e.key === 't') {
+            e.preventDefault();
+            const activeTab = document.querySelector('#reportTabs .nav-link.active');
+            if (activeTab) {
+                const currentTabId = activeTab.getAttribute('data-bs-target');
+                let nextTabId = '#dataTab';
+                
+                if (currentTabId === '#dataTab') nextTabId = '#jsonTab';
+                else if (currentTabId === '#jsonTab') nextTabId = '#chartsTab';
+                else if (currentTabId === '#chartsTab') nextTabId = '#dataTab';
+                
+                // Use Bootstrap's tab API to switch tabs
+                const nextTab = document.querySelector(`.nav-link[data-bs-target="${nextTabId}"]`);
+                if (nextTab && typeof bootstrap !== 'undefined') {
+                    const tab = new bootstrap.Tab(nextTab);
+                    tab.show();
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

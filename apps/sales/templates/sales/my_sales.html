@@ -1,0 +1,315 @@
+={% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}My Sales History{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- Header -->
+    <div class="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-history mr-3 text-blue-600"></i>
+                My Sales History
+            </h1>
+            <p class="text-gray-600 mt-2">View your sales transactions and performance</p>
+        </div>
+        <div class="mt-4 sm:mt-0">
+            <a href="{% url 'sales_dashboard' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition duration-200 flex items-center">
+                <i class="fas fa-plus-circle mr-2"></i>New Sale
+            </a>
+        </div>
+    </div> 
+
+    <!-- Date Filter -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Filter Sales</h3>
+        <form id="date-filter-form" class="flex flex-col sm:flex-row gap-4">
+            <div class="flex-1">
+                <label class="block text-sm font-medium text-gray-700 mb-2">From Date</label>
+                <input type="date" id="date-from" name="date_from" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div class="flex-1">
+                <label class="block text-sm font-medium text-gray-700 mb-2">To Date</label>
+                <input type="date" id="date-to" name="date_to" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div class="flex items-end">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md transition duration-200 flex items-center">
+                    <i class="fas fa-filter mr-2"></i>Filter
+                </button>
+                <button type="button" id="clear-filter" class="ml-2 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition duration-200">
+                    Clear
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center">
+                <div class="p-3 bg-blue-100 rounded-lg">
+                    <i class="fas fa-receipt text-blue-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Total Sales</p>
+                    <p id="total-sales-count" class="text-2xl font-bold text-gray-900">0</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center">
+                <div class="p-3 bg-green-100 rounded-lg">
+                    <i class="fas fa-dollar-sign text-green-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Total Revenue</p>
+                    <p id="total-revenue" class="text-2xl font-bold text-gray-900">$0.00</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center">
+                <div class="p-3 bg-purple-100 rounded-lg">
+                    <i class="fas fa-calendar text-purple-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Average per Sale</p>
+                    <p id="average-sale" class="text-2xl font-bold text-gray-900">$0.00</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sales Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-900">Sales Transactions</h3>
+            <div class="flex items-center space-x-2">
+                <span id="loading-indicator" class="hidden text-sm text-gray-500">
+                    <i class="fas fa-spinner fa-spin mr-2"></i>Loading...
+                </span>
+                <button id="refresh-data" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                    <i class="fas fa-sync-alt mr-1"></i>Refresh
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sale ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="sales-table-body">
+                    <tr id="loading-row">
+                        <td colspan="5" class="px-6 py-12 text-center">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                            <p class="mt-2 text-gray-600">Loading sales data...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="flex justify-between px-6 py-4 bg-gray-50 items-center">
+            <button id="prev-page" class="px-4 py-2 bg-gray-200 rounded" disabled>Previous</button>
+            <div id="page-info" class="text-sm text-gray-700"></div>
+            <button id="next-page" class="px-4 py-2 bg-gray-200 rounded" disabled>Next</button>
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden px-6 py-12 text-center">
+            <i class="fas fa-receipt text-4xl text-gray-300 mb-3"></i>
+            <p class="text-gray-500">No sales records found</p>
+            <p class="text-sm text-gray-400 mt-1">Start making sales to see them here</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-state" class="hidden px-6 py-12 text-center">
+            <i class="fas fa-exclamation-triangle text-4xl text-red-300 mb-3"></i>
+            <p class="text-gray-500">Error loading sales data</p>
+            <p class="text-sm text-gray-400 mt-1">Please try refreshing the page</p>
+        </div>
+    </div>
+</div>
+
+<script>
+class SalesHistory {
+    constructor() {
+        this.salesData = [];
+        this.currentFilters = {};
+        this.nextPageUrl = null;
+        this.prevPageUrl = null;
+        this.init();
+    }
+
+    init() {
+        this.setupEventListeners();
+        this.loadSalesData();
+    }
+
+    setupEventListeners() {
+        document.getElementById('date-filter-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.applyFilters();
+        });
+
+        document.getElementById('clear-filter').addEventListener('click', () => {
+            this.clearFilters();
+        });
+
+        document.getElementById('refresh-data').addEventListener('click', () => {
+            this.loadSalesData();
+        });
+
+        document.getElementById('prev-page').addEventListener('click', () => {
+            if (this.prevPageUrl) this.loadSalesDataFromUrl(this.prevPageUrl);
+        });
+
+        document.getElementById('next-page').addEventListener('click', () => {
+            if (this.nextPageUrl) this.loadSalesDataFromUrl(this.nextPageUrl);
+        });
+    }
+
+    async loadSalesData(filters = {}) {
+        this.showLoading();
+        const query = new URLSearchParams(filters).toString();
+        const url = `/sales/api/my-sales/${query ? `?${query}` : ''}`;
+        await this.loadSalesDataFromUrl(url);
+    }
+
+    async loadSalesDataFromUrl(url) {
+        this.showLoading();
+        try {
+            const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            this.salesData = data.results;
+            this.nextPageUrl = data.next;
+            this.prevPageUrl = data.previous;
+            this.renderSalesData(data.count);
+        } catch (error) {
+            console.error('Error loading sales data:', error);
+            this.showError();
+        }
+    }
+
+    applyFilters() {
+        const formData = new FormData(document.getElementById('date-filter-form'));
+        const filters = {};
+        for (let [key, value] of formData.entries()) {
+            if (value) filters[key] = value;
+        }
+        this.currentFilters = filters;
+        this.loadSalesData(filters);
+    }
+
+    clearFilters() {
+        document.getElementById('date-filter-form').reset();
+        this.currentFilters = {};
+        this.loadSalesData();
+    }
+
+    renderSalesData(totalCount) {
+        const tableBody = document.getElementById('sales-table-body');
+        const emptyState = document.getElementById('empty-state');
+        const errorState = document.getElementById('error-state');
+        const pageInfo = document.getElementById('page-info');
+
+        document.getElementById('loading-row').classList.add('hidden');
+        errorState.classList.add('hidden');
+
+        if (this.salesData.length === 0) {
+            tableBody.innerHTML = '';
+            emptyState.classList.remove('hidden');
+            pageInfo.textContent = '';
+            document.getElementById('prev-page').disabled = true;
+            document.getElementById('next-page').disabled = true;
+            this.updateSummaryCards(0, 0);
+            return;
+        }
+
+        emptyState.classList.add('hidden');
+
+        tableBody.innerHTML = this.salesData.map(sale => `
+            <tr class="hover:bg-gray-50 transition duration-150">
+                <td class="px-6 py-4 whitespace-nowrap">#${sale.sale_id.slice(0,8)}</td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div>${new Date(sale.timestamp).toLocaleDateString()}</div>
+                    <div class="text-gray-500 text-sm">${new Date(sale.timestamp).toLocaleTimeString()}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">${sale.items_count} items</td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-green-600 font-semibold">
+                    $${parseFloat(sale.total_amount).toFixed(2)}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <a href="/sales/sale/${sale.sale_id}/" class="text-blue-600 hover:text-blue-900">
+                        <i class="fas fa-eye mr-1"></i>View
+                    </a>
+                </td>
+            </tr>
+        `).join('');
+
+        // Update page info
+        const pageSize = 20;
+        const currentPage = this.prevPageUrl ? parseInt(new URL(this.prevPageUrl).searchParams.get('page') || 1) + 1 : 1;
+        const totalPages = Math.ceil(totalCount / pageSize);
+        pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+
+        document.getElementById('prev-page').disabled = !this.prevPageUrl;
+        document.getElementById('next-page').disabled = !this.nextPageUrl;
+
+        this.updateSummaryCards();
+    }
+
+    updateSummaryCards() {
+        const totalSales = this.salesData.length;
+        const totalRevenue = this.salesData.reduce((sum, sale) => sum + parseFloat(sale.total_amount), 0);
+        const averageSale = totalSales > 0 ? totalRevenue / totalSales : 0;
+
+        document.getElementById('total-sales-count').textContent = totalSales;
+        document.getElementById('total-revenue').textContent = `$${totalRevenue.toFixed(2)}`;
+        document.getElementById('average-sale').textContent = `$${averageSale.toFixed(2)}`;
+    }
+
+    showLoading() {
+        document.getElementById('loading-indicator').classList.remove('hidden');
+        document.getElementById('loading-row').classList.remove('hidden');
+        document.getElementById('empty-state').classList.add('hidden');
+        document.getElementById('error-state').classList.add('hidden');
+    }
+
+    showError() {
+        document.getElementById('loading-indicator').classList.add('hidden');
+        document.getElementById('loading-row').classList.add('hidden');
+        document.getElementById('empty-state').classList.add('hidden');
+        document.getElementById('error-state').classList.remove('hidden');
+
+        document.getElementById('total-sales-count').textContent = '0';
+        document.getElementById('total-revenue').textContent = '$0.00';
+        document.getElementById('average-sale').textContent = '$0.00';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    window.salesHistory = new SalesHistory();
+});
+</script>
+
+<style>
+.hidden { display: none !important; }
+tr { transition: all 0.2s ease-in-out; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.animate-spin { animation: spin 1s linear infinite; }
+</style>
+{% endblock %}

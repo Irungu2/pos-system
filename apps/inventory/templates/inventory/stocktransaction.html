@@ -1,0 +1,378 @@
+{% extends "inventory/inventory_base.html" %}
+
+{% block title %}Stock Transactions{% endblock %}
+
+{% block content %}
+<h2>Stock Transactions</h2>
+
+<!-- Global Error Display -->
+<div class="error" id="transaction-error" style="color:red; margin-bottom:1em; display:none;"></div>
+<div class="success" id="transaction-success" style="color:green; margin-bottom:1em; display:none;"></div>
+
+<!-- Stats Cards -->
+<div class="stats-cards" style="display:flex; gap:1em; margin-bottom:1em;">
+    <div class="card" style="padding:1em; background:#f0f0f0; border-radius:5px; flex:1; text-align:center;">
+        <div>Stock In</div>
+        <strong id="in-count">0</strong>
+        <div style="font-size:12px; color:#666;" id="in-quantity">0 units</div>
+    </div>
+    <div class="card" style="padding:1em; background:#f0f0f0; border-radius:5px; flex:1; text-align:center;">
+        <div>Stock Out</div>
+        <strong id="out-count">0</strong>
+        <div style="font-size:12px; color:#666;" id="out-quantity">0 units</div>
+    </div>
+    <div class="card" style="padding:1em; background:#f0f0f0; border-radius:5px; flex:1; text-align:center;">
+        <div>Transfers</div>
+        <strong id="transfer-count">0</strong>
+        <div style="font-size:12px; color:#666;" id="transfer-quantity">0 units</div>
+    </div>
+    <div class="card" style="padding:1em; background:#f0f0f0; border-radius:5px; flex:1; text-align:center;">
+        <div>Total</div>
+        <strong id="total-count">0</strong>
+        <div style="font-size:12px; color:#666;" id="total-quantity">0 units</div>
+    </div>
+</div>
+
+<!-- Action Buttons -->
+<div style="margin-bottom:1em; display:flex; gap:10px;">
+    <button id="new-transaction-btn" style="background:#28a745; color:white; border:none; padding:8px 16px; border-radius:3px; cursor:pointer;">
+        + New Transaction
+    </button>
+<!--     <a href="{% url 'inventory:bulk-restock-ui' %}" style="background:#007bff; color:white; border:none; padding:8px 16px; border-radius:3px; cursor:pointer; text-decoration:none; display:inline-block;">
+        + Bulk Restock
+    </a> -->
+</div>
+
+<!-- Filters -->
+<div class="filters" style="margin-bottom:1em; padding:1em; background:#fff; border-radius:5px; border:1px solid #dee2e6;">
+    <div style="display:flex; gap:15px; flex-wrap:wrap; align-items:flex-end;">
+        <div style="flex:1; min-width:200px;">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Transaction Type</label>
+            <select id="filter-transaction-type" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:4px;">
+                <option value="">All Types</option>
+                <option value="IN">Stock In</option>
+                <option value="OUT">Stock Out</option>
+                <option value="TRANSFER">Transfer</option>
+            </select>
+        </div>
+        
+        <div style="flex:1; min-width:200px;">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Product</label>
+            <select id="filter-product" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:4px;">
+                <option value="">All Products</option>
+            </select>
+        </div>
+        
+        <div style="flex:1; min-width:200px;">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Store</label>
+            <select id="filter-store" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:4px;">
+                <option value="">All Stores</option>
+            </select>
+        </div>
+        
+        <div style="flex:1; min-width:200px;">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Performed By</label>
+            <select id="filter-user" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:4px;">
+                <option value="">All Users</option>
+            </select>
+        </div>
+        
+        <div style="flex:1; min-width:200px;">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Date From</label>
+            <input type="date" id="filter-date-from" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:4px;">
+        </div>
+        
+        <div style="flex:1; min-width:200px;">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Date To</label>
+            <input type="date" id="filter-date-to" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:4px;">
+        </div>
+        
+        <div style="flex:1; min-width:200px;">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Reference</label>
+            <input type="text" id="filter-reference" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:4px;" placeholder="Search by reference">
+        </div>
+        
+        <div>
+            <button id="clear-filters" style="background:#6c757d; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; margin-top:8px;">
+                Clear Filters
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Transactions Table -->
+<div style="overflow-x:auto;">
+    <table border="1" style="width:100%; margin-top:1em; border-collapse:collapse;">
+        <thead>
+            <tr style="background:#f8f9fa;">
+                <th style="padding:10px; text-align:left;">Date & Time</th>
+                <th style="padding:10px; text-align:left;">Type</th>
+                <th style="padding:10px; text-align:left;">Product</th>
+                <th style="padding:10px; text-align:left;">SKU</th>
+                <th style="padding:10px; text-align:left;">Store</th>
+                <th style="padding:10px; text-align:left;">Quantity</th>
+                <th style="padding:10px; text-align:left;">Reference</th>
+                <th style="padding:10px; text-align:left;">Performed By</th>
+                <th style="padding:10px; text-align:left;">Remarks</th>
+            </tr>
+        </thead>
+        <tbody id="transaction-list">
+            <tr>
+                <td colspan="9" style="padding:40px; text-align:center;">Loading transactions...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+<div class="pagination" style="margin-top:1em; display:flex; justify-content:center; align-items:center; gap:10px;">
+    <button id="prev-page" style="padding:5px 15px; background:#6c757d; color:white; border:none; border-radius:3px; cursor:pointer;">Prev</button>
+    <span id="transaction-count" style="padding:5px 10px;">Loading...</span>
+    <button id="next-page" style="padding:5px 15px; background:#6c757d; color:white; border:none; border-radius:3px; cursor:pointer;">Next</button>
+</div>
+
+<!-- Transaction Modal -->
+<div id="transaction-modal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background-color:white; border-radius:8px; max-width:800px; width:90%; max-height:90vh; overflow-y:auto; box-shadow:0 4px 20px rgba(0,0,0,0.15);">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:20px; border-bottom:1px solid #dee2e6;">
+            <h3 style="margin:0; font-size:1.5rem; color:#333;">New Transaction</h3>
+            <button id="close-transaction-modal-btn" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#6c757d;">&times;</button>
+        </div>
+        
+        <div style="padding:20px;">
+            <div id="modal-error" style="color:red; margin-bottom:1em; display:none;"></div>
+            
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:16px; margin-bottom:20px;">
+                <div>
+                    <label style="display:block; margin-bottom:8px; font-weight:500;">Transaction Type *</label>
+                    <select id="transaction-type" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:4px;" required>
+                        <option value="">Select type</option>
+                        <option value="IN">Stock In</option>
+                        <option value="OUT">Stock Out</option>
+                        <option value="TRANSFER">Transfer</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label style="display:block; margin-bottom:8px; font-weight:500;">Product *</label>
+                    <select id="transaction-product" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:4px;" required>
+                        <option value="">Select product</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label style="display:block; margin-bottom:8px; font-weight:500;">Store *</label>
+                    <select id="transaction-store" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:4px;" required>
+                        <option value="">Select store</option>
+                    </select>
+                </div>
+                
+                <div id="transfer-to-group" style="display:none;">
+                    <label style="display:block; margin-bottom:8px; font-weight:500;">Transfer To Store *</label>
+                    <select id="transfer-to-store" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:4px;">
+                        <option value="">Select destination store</option>
+                    </select>
+                    <small style="color:#666; font-size:12px; display:block; margin-top:4px;">Select the destination store for the transfer</small>
+                </div>
+                
+                <div>
+                    <label style="display:block; margin-bottom:8px; font-weight:500;">Quantity *</label>
+                    <input type="number" id="transaction-quantity" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:4px;" min="1" value="1" required>
+                </div>
+                
+                <div>
+                    <label style="display:block; margin-bottom:8px; font-weight:500;">Reference</label>
+                    <input type="text" id="transaction-reference" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:4px;" placeholder="Optional reference number">
+                </div>
+            </div>
+            
+            <div style="margin-bottom:20px;">
+                <label style="display:block; margin-bottom:8px; font-weight:500;">Remarks</label>
+                <textarea id="transaction-remarks" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:4px; min-height:100px; resize:vertical;" placeholder="Add any remarks or notes about this transaction"></textarea>
+            </div>
+            
+            <!-- Stock Info Display -->
+            <div id="stock-info" style="display:none; background:#f8f9fa; border-radius:8px; padding:20px; margin-top:20px; border-left:4px solid #4a90e2;">
+                <h4 style="margin:0 0 12px 0; color:#333; font-size:16px;">Current Stock Information</h4>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+                    <div>
+                        <div style="font-size:12px; color:#666; margin-bottom:4px;">Current Stock:</div>
+                        <div id="current-stock" style="font-size:16px; font-weight:600; color:#333;">0</div>
+                    </div>
+                    <div>
+                        <div style="font-size:12px; color:#666; margin-bottom:4px;">Reorder Level:</div>
+                        <div id="reorder-level" style="font-size:16px; font-weight:600; color:#333;">0</div>
+                    </div>
+                    <div>
+                        <div style="font-size:12px; color:#666; margin-bottom:4px;">Status:</div>
+                        <div id="stock-status" style="font-size:16px; font-weight:600; color:#333;">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="padding:20px; border-top:1px solid #dee2e6; display:flex; justify-content:flex-end; gap:10px;">
+            <button id="transaction-cancel" style="background:#6c757d; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">
+                Cancel
+            </button>
+            <button id="transaction-submit" style="background:#28a745; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">
+                Save Transaction
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Load JS -->
+{% load static %}
+<script src="{% static 'js/inventory/stocktransaction.js' %}?v=1.0"></script>
+
+<style>
+    /* Status badges */
+    .type-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: inline-block;
+    }
+    
+    .type-in {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .type-out {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .type-transfer {
+        background: #cce5ff;
+        color: #004085;
+        border: 1px solid #b8daff;
+    }
+    
+    /* Table styling */
+    table { border-collapse: collapse; font-size: 14px; width: 100%; }
+    th { background: #f8f9fa; padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6; }
+    td { padding: 8px 10px; border-top: 1px solid #dee2e6; }
+    tr:hover { background: #f8f9fa; }
+    
+    /* Modal backdrop */
+    .modal-backdrop { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index:1000; }
+    .modal-backdrop.active { display:block; }
+    
+    button:disabled { opacity:0.5; cursor:not-allowed; }
+    
+    /* Stock status */
+    .low-stock { color: #dc3545; }
+    .adequate { color: #28a745; }
+    
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .stats-cards { flex-direction: column; }
+        .filters > div { flex-direction: column; }
+        #transaction-modal > div { width: 95%; }
+        table { font-size:12px; }
+        .modal-grid { grid-template-columns: 1fr; }
+    }
+</style>
+
+<script>
+// Simple modal functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('transaction-modal');
+    const closeBtn = document.getElementById('close-transaction-modal-btn');
+    const cancelBtn = document.getElementById('transaction-cancel');
+    const newBtn = document.getElementById('new-transaction-btn');
+    const transactionTypeSelect = document.getElementById('transaction-type');
+    const transferToGroup = document.getElementById('transfer-to-group');
+    
+    // Create modal backdrop
+    function createBackdrop() {
+        let backdrop = document.querySelector('.modal-backdrop');
+        if (!backdrop) {
+            backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop';
+            backdrop.addEventListener('click', hideAllModals);
+            document.body.appendChild(backdrop);
+        }
+        return backdrop;
+    }
+    
+    // Hide all modals
+    function hideAllModals() {
+        modal.style.display = 'none';
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) backdrop.classList.remove('active');
+    }
+    
+    // Show modal with backdrop
+    function showModal() {
+        modal.style.display = 'flex';
+        createBackdrop().classList.add('active');
+    }
+    
+    // Show/hide transfer destination field
+    transactionTypeSelect.addEventListener('change', function() {
+        if (this.value === 'TRANSFER') {
+            transferToGroup.style.display = 'block';
+        } else {
+            transferToGroup.style.display = 'none';
+        }
+    });
+    
+    // Open modal
+    if (newBtn) {
+        newBtn.addEventListener('click', showModal);
+    }
+    
+    // Close buttons
+    if (closeBtn) closeBtn.addEventListener('click', hideAllModals);
+    if (cancelBtn) cancelBtn.addEventListener('click', hideAllModals);
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) hideAllModals();
+    });
+    
+    // Close with Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') hideAllModals();
+    });
+    
+    // Submit button will be handled by main JavaScript
+    const submitBtn = document.getElementById('transaction-submit');
+    if (submitBtn) {
+        submitBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Will be handled by stocktransaction.js
+            if (window.transactionController) {
+                window.transactionController.submitTransaction();
+            }
+        });
+    }
+    
+    // Quantity input enter key
+    const quantityInput = document.getElementById('transaction-quantity');
+    if (quantityInput) {
+        quantityInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (window.transactionController) {
+                    window.transactionController.submitTransaction();
+                }
+            }
+        });
+    }
+    
+    console.log('Stock Transactions HTML template loaded');
+    console.log('CSRF Token:', document.querySelector('input[name="csrfmiddlewaretoken"]')?.value ? 'Present' : 'Missing');
+});
+</script>
+
+{% endblock %}

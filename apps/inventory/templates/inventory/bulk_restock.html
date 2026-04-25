@@ -1,0 +1,263 @@
+{% extends "inventory/inventory_base.html" %}
+
+{% load static %}
+
+{% block title %}Bulk Restock{% endblock %}
+
+{% block extra_head %}
+<style>
+/* --------------------------------------------------
+   Professional Bulk Restock UI Styling
+   Clean • Modern • Enterprise-level
+---------------------------------------------------*/
+
+.container {
+    max-width: 1150px;
+    margin-top: 30px;
+}
+
+/* Page Header */
+.header-row h2 {
+    font-weight: 700;
+    letter-spacing: -0.4px;
+}
+.header-row p {
+    font-size: 1.05rem;
+}
+
+/* Cards */
+.card {
+    border-radius: 12px;
+    border: 1px solid #e2e5ea;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 14px 20px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    border-radius: 12px 12px 0 0 !important;
+}
+
+/* Colored Headers */
+.bg-primary { background: linear-gradient(90deg, #0d6efd, #0a58ca) !important; }
+.bg-info { background: linear-gradient(90deg, #0dcaf0, #31d2f2) !important; }
+.bg-success { background: linear-gradient(90deg, #198754, #157347) !important; }
+
+/* Form Labels */
+.form-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #333;
+}
+
+/* Button Group */
+.btn-group .btn {
+    flex: 1;
+    padding: 10px 12px;
+    font-weight: 500;
+    transition: 0.2s;
+}
+
+.btn-group .btn:hover {
+    background-color: #ebf2ff;
+    border-color: #bcd3ff;
+}
+
+.btn-group .btn.active {
+    background-color: #0d6efd !important;
+    color: #fff !important;
+}
+
+.btn-group .btn:focus {
+    box-shadow: none !important;
+}
+
+/* Category Section Animation */
+#category-section {
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+#category-section.d-none {
+    opacity: 0;
+    transform: translateY(-5px);
+}
+#category-section:not(.d-none) {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Action Buttons */
+#generate-excel-btn,
+#upload-btn {
+    font-size: 1.07rem;
+    font-weight: 600;
+    padding: 13px;
+    border-radius: 8px;
+    transition: 0.2s ease;
+}
+
+#generate-excel-btn:hover,
+#upload-btn:hover {
+    transform: translateY(-1px);
+}
+
+/* File Input */
+input[type="file"] {
+    padding: 7px;
+    background-color: #fdfdfd;
+    border: 1px solid #ced4da;
+}
+
+/* Notes box */
+textarea {
+    resize: vertical;
+    min-height: 70px;
+}
+
+/* Alerts */
+.alert {
+    border-radius: 10px;
+    padding: 15px 18px;
+}
+#status-alert {
+    font-size: 1.05rem;
+}
+
+/* List improvements */
+ol li {
+    margin-bottom: 8px;
+    font-size: 1rem;
+}
+
+.alert-warning ul li {
+    margin-bottom: 6px;
+}
+
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div class="container">
+    {% csrf_token %}
+    
+    <div class="header-row mb-4">
+        <h2 class="mb-1">Bulk Restock</h2>
+        <p class="text-muted">Manage inventory updates efficiently using structured Excel templates.</p>
+    </div>
+
+    <!-- Quick Restock Options -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            Quick Restock Options
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                
+                <!-- Store Selection -->
+                <div class="col-md-6">
+                    <label class="form-label">Select Store</label>
+                    <select id="store-select" class="form-select" required>
+                        <option value="">Choose store...</option>
+                        {% for store in stores %}
+                        <option value="{{ store.id }}">{{ store.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Type Selection -->
+                <div class="col-md-6">
+                    <label class="form-label">Restock Type</label>
+                    <div class="btn-group w-100">
+                        <button type="button" class="btn btn-outline-primary" data-type="all">All Items</button>
+                        <button type="button" class="btn btn-outline-primary" data-type="category">By Category</button>
+                        <button type="button" class="btn btn-outline-primary" data-type="low">Low Stock Only</button>
+                    </div>
+                </div>
+
+                <!-- Category Select -->
+                <div class="col-md-6 d-none" id="category-section">
+                    <label class="form-label">Select Category</label>
+                    <select id="category-select" class="form-select">
+                        <option value="">All Categories</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}">{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Generate Button -->
+                <div class="col-md-12 mt-2">
+                    <button id="generate-excel-btn" class="btn btn-primary btn-lg w-100" disabled>
+                        Generate Excel Template
+                    </button>
+                    <div class="form-text mt-1">
+                        Download a ready-to-update Excel file including current stock levels.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            How to Restock
+        </div>
+        <div class="card-body">
+            <ol class="mb-3">
+                <li>Select a store and restock type above.</li>
+                <li>Download the Excel template containing current stock levels.</li>
+                <li>Update only the <strong>New Stock</strong> (and optional <strong>New Price</strong>) fields.</li>
+                <li>Upload the completed file to process your restock.</li>
+            </ol>
+
+            <div class="alert alert-warning mb-0">
+                <strong>Important:</strong>
+                <ul class="mt-2 mb-0">
+                    <li>Do not modify Product ID, SKU, Category, or existing columns.</li>
+                    <li>Only update the New Stock / New Price columns.</li>
+                    <li>Do not add or remove rows.</li>
+                    <li>Save as .xlsx before uploading.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Excel -->
+    <div class="card">
+        <div class="card-header bg-success text-white">
+            Upload Completed Restock
+        </div>
+        <div class="card-body">
+            <form id="upload-form">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label for="excel-file" class="form-label">Select Excel File</label>
+                    <input type="file" class="form-control" id="excel-file" accept=".xlsx,.xls" required>
+                    <div class="form-text">Upload the completed template to update inventory.</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="restock-notes" class="form-label">Notes (Optional)</label>
+                    <textarea class="form-control" id="restock-notes" rows="2" placeholder="Add any notes for this restock..."></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-success btn-lg w-100" id="upload-btn">
+                    Upload & Process Restock
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Status -->
+    <div id="status-alert" class="alert alert-info d-none mt-4"></div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/inventory/bulkrestock.js' %}?v={{ APP_VERSION }}"></script>
+{% endblock %}

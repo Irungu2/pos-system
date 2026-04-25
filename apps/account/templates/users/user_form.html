@@ -1,0 +1,493 @@
+{% extends "inventory/inventory_base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="user-form-container">
+    <div class="form-wrapper">
+        <div class="form-header">
+            <div class="header-icon">
+                <i class="fas {% if form.instance.pk %}fa-user-edit{% else %}fa-user-plus{% endif %}"></i>
+            </div>
+            <div class="header-text">
+                <h1 class="form-title">
+                    {% if form.instance.pk %}Edit User{% else %}Create New User{% endif %}
+                </h1>
+                <p class="form-subtitle">
+                    {% if form.instance.pk %}
+                        Update user information
+                    {% else %}
+                        Add a new user to the system
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+
+        <div class="form-card">
+            {% if form.instance.pk and form.instance.unique_id %}
+                <div class="info-badge">
+                    <i class="fas fa-id-card"></i>
+                    <span><strong>Unique ID:</strong> <code>{{ form.instance.unique_id }}</code></span>
+                    <small>(Auto-generated, cannot be changed)</small>
+                </div>
+            {% endif %}
+            
+            <form method="post" class="user-form" id="userForm">
+                {% csrf_token %}
+                
+                <div class="form-row">
+                    {% for field in form %}
+                    <div class="form-group">
+                        <label for="{{ field.id_for_label }}" class="form-label">
+                            {{ field.label }}
+                            {% if field.field.required %}
+                                <span class="required-star">*</span>
+                            {% endif %}
+                            {% if field.name == 'password' and form.instance.pk %}
+                                <span class="optional-badge">Optional</span>
+                            {% endif %}
+                        </label>
+                        
+                        <div class="input-wrapper">
+                            {% if field.name == 'password' %}
+                                <i class="fas fa-lock input-icon"></i>
+                            {% elif field.name == 'first_name' %}
+                                <i class="fas fa-user input-icon"></i>
+                            {% elif field.name == 'last_name' %}
+                                <i class="fas fa-user input-icon"></i>
+                            {% elif field.name == 'role' %}
+                                <i class="fas fa-user-tag input-icon"></i>
+                            {% endif %}
+                            
+                            {{ field }}
+                        </div>
+                        
+                        {% if field.name == 'password' and form.instance.pk %}
+                            <div class="input-hint">
+                                <i class="fas fa-info-circle"></i> Leave blank to keep current password
+                            </div>
+                        {% endif %}
+                        
+                        {% if field.help_text and field.name != 'password' %}
+                            <small class="field-help-text">{{ field.help_text }}</small>
+                        {% endif %}
+                        
+                        {% if field.errors %}
+                            <div class="field-errors">
+                                {% for error in field.errors %}
+                                    <div class="error-message">
+                                        <i class="fas fa-exclamation-circle"></i> {{ error }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="form-actions">
+                    <a href="{% url 'user_list' %}" class="btn-cancel">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn-submit">
+                        <i class="fas {% if form.instance.pk %}fa-save{% else %}fa-user-plus{% endif %}"></i> 
+                        {% if form.instance.pk %}Update User{% else %}Create User{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        {% if form.instance.pk %}
+        <div class="info-card">
+            <div class="info-header">
+                <i class="fas fa-info-circle"></i>
+                <strong>Note:</strong>
+            </div>
+            <div class="info-body">
+                <ul class="info-list">
+                    <li><i class="fas fa-key"></i> Leave password blank to keep current password</li>
+                    <li><i class="fas fa-id-card"></i> Unique ID is automatically generated and cannot be modified</li>
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    /* Reset and container - NO SCROLLING */
+    .user-form-container {
+        height: calc(100vh - 60px);
+        background: #f5f7fa;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        overflow: hidden;
+    }
+    
+    .form-wrapper {
+        max-width: 750px;
+        width: 100%;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        overflow: hidden;
+    }
+    
+    /* Header - Light and clean */
+    .form-header {
+        background: white;
+        padding: 1.25rem;
+        text-align: center;
+        border-bottom: 1px solid #eef2f6;
+    }
+    
+    .header-icon {
+        width: 55px;
+        height: 55px;
+        background: #e8f0fe;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 0.75rem;
+    }
+    
+    .header-icon i {
+        font-size: 1.6rem;
+        color: #4a90e2;
+    }
+    
+    .form-title {
+        font-size: 1.4rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin: 0 0 0.2rem 0;
+    }
+    
+    .form-subtitle {
+        color: #7f8c8d;
+        font-size: 0.8rem;
+        margin: 0;
+    }
+    
+    /* Form Card - Compact */
+    .form-card {
+        padding: 1.25rem;
+        background: white;
+    }
+    
+    /* Info Badge */
+    .info-badge {
+        background: #f8f9fa;
+        border-left: 3px solid #4a90e2;
+        padding: 0.6rem 1rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        font-size: 0.85rem;
+    }
+    
+    .info-badge i {
+        color: #4a90e2;
+        font-size: 1rem;
+    }
+    
+    .info-badge code {
+        background: #e8f0fe;
+        padding: 2px 6px;
+        border-radius: 4px;
+        color: #4a90e2;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+    
+    .info-badge small {
+        color: #95a5a6;
+        font-size: 0.7rem;
+    }
+    
+    /* Form Layout - 2 columns */
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+    
+    /* Full width fields */
+    .form-group:has(#id_password) {
+        grid-column: span 2;
+    }
+    
+    /* Form Groups */
+    .form-group {
+        margin-bottom: 0;
+    }
+    
+    .form-label {
+        display: block;
+        margin-bottom: 0.4rem;
+        font-weight: 500;
+        color: #2c3e50;
+        font-size: 0.8rem;
+    }
+    
+    .required-star {
+        color: #e74c3c;
+        margin-left: 2px;
+    }
+    
+    .optional-badge {
+        background: #e8f0fe;
+        color: #4a90e2;
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-size: 0.65rem;
+        font-weight: normal;
+        margin-left: 6px;
+    }
+    
+    /* Input Wrapper */
+    .input-wrapper {
+        position: relative;
+    }
+    
+    .input-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #95a5a6;
+        font-size: 0.85rem;
+        pointer-events: none;
+        z-index: 1;
+    }
+    
+    /* Form Inputs - Clean */
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 0.55rem 0.75rem 0.55rem 2.2rem;
+        border: 1px solid #dcdfe6;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+        background: white;
+    }
+    
+    .form-group input:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: #4a90e2;
+        box-shadow: 0 0 0 2px rgba(74,144,226,0.1);
+    }
+    
+    /* Input Hint */
+    .input-hint {
+        margin-top: 6px;
+        font-size: 0.7rem;
+        color: #7f8c8d;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .input-hint i {
+        font-size: 0.7rem;
+        color: #f39c12;
+    }
+    
+    /* Help Text */
+    .field-help-text {
+        display: block;
+        margin-top: 4px;
+        font-size: 0.7rem;
+        color: #95a5a6;
+    }
+    
+    /* Error Message */
+    .field-errors {
+        margin-top: 4px;
+    }
+    
+    .error-message {
+        background: #fdeded;
+        color: #e74c3c;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .error-message i {
+        font-size: 0.7rem;
+    }
+    
+    /* Form Actions */
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.25rem;
+        padding-top: 1rem;
+        border-top: 1px solid #eef2f6;
+    }
+    
+    .btn-cancel,
+    .btn-submit {
+        flex: 1;
+        padding: 0.55rem 1rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        text-align: center;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s;
+    }
+    
+    .btn-cancel {
+        background: #f8f9fa;
+        color: #6c757d;
+        border: 1px solid #dcdfe6;
+    }
+    
+    .btn-cancel:hover {
+        background: #e9ecef;
+        color: #495057;
+        text-decoration: none;
+    }
+    
+    .btn-submit {
+        background: #4a90e2;
+        color: white;
+    }
+    
+    .btn-submit:hover {
+        background: #357abd;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(74,144,226,0.25);
+    }
+    
+    /* Info Card */
+    .info-card {
+        background: #f8f9fa;
+        padding: 0.75rem 1rem;
+        border-top: 1px solid #eef2f6;
+    }
+    
+    .info-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 0.5rem;
+        color: #4a90e2;
+        font-size: 0.8rem;
+    }
+    
+    .info-header i {
+        font-size: 0.9rem;
+    }
+    
+    .info-list {
+        margin: 0;
+        padding-left: 1.2rem;
+    }
+    
+    .info-list li {
+        margin-bottom: 4px;
+        color: #7f8c8d;
+        font-size: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .info-list li i {
+        color: #4a90e2;
+        font-size: 0.7rem;
+        width: 14px;
+    }
+    
+    /* Loading State */
+    .btn-submit.loading {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+    
+    .btn-submit.loading i {
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    
+    /* Responsive */
+    @media (max-width: 600px) {
+        .user-form-container {
+            padding: 0.5rem;
+        }
+        
+        .form-row {
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+        }
+        
+        .form-group:has(#id_password) {
+            grid-column: span 1;
+        }
+        
+        .form-header {
+            padding: 1rem;
+        }
+        
+        .form-card {
+            padding: 1rem;
+        }
+        
+        .form-actions {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .header-icon {
+            width: 45px;
+            height: 45px;
+        }
+        
+        .header-icon i {
+            font-size: 1.3rem;
+        }
+        
+        .form-title {
+            font-size: 1.2rem;
+        }
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('userForm');
+        const submitBtn = document.querySelector('.btn-submit');
+        
+        if (form && submitBtn) {
+            form.addEventListener('submit', function() {
+                submitBtn.classList.add('loading');
+                submitBtn.innerHTML = '<i class="fas fa-spinner"></i> {% if form.instance.pk %}Updating...{% else %}Creating...{% endif %}';
+                submitBtn.disabled = true;
+            });
+        }
+    });
+</script>
+{% endblock %}

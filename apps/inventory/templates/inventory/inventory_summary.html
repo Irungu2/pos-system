@@ -1,0 +1,50 @@
+{% extends "inventory/inventory_base.html" %}
+
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto py-8">
+    <h1 class="text-3xl font-bold mb-6">Inventory Summary</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Total Products -->
+        <div class="bg-white shadow rounded-lg p-6 text-center">
+            <h2 class="text-lg font-semibold text-gray-700">Total Products</h2>
+            <p class="text-4xl font-bold text-gray-900 mt-2">{{ total_products }}</p>
+        </div>
+
+        <!-- Total Categories -->
+        <div class="bg-white shadow rounded-lg p-6 text-center">
+            <h2 class="text-lg font-semibold text-gray-700">Total Categories</h2>
+            <p class="text-4xl font-bold text-gray-900 mt-2">{{ total_categories }}</p>
+        </div>
+
+        <!-- Total Stores -->
+        <div class="bg-white shadow rounded-lg p-6 text-center">
+            <h2 class="text-lg font-semibold text-gray-700">Total Stores</h2>
+            <p class="text-4xl font-bold text-gray-900 mt-2">{{ total_stores }}</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+        <!-- Low Stock Count -->
+        <div class="bg-yellow-100 shadow rounded-lg p-6 text-center">
+            <h2 class="text-lg font-semibold text-yellow-800">Low Stock Items</h2>
+            <p class="text-4xl font-bold text-yellow-900 mt-2">{{ low_stock_count }}</p>
+        </div>
+
+        <!-- Out of Stock Count -->
+        <div class="bg-red-100 shadow rounded-lg p-6 text-center">
+            <h2 class="text-lg font-semibold text-red-800">Out of Stock Items</h2>
+            <p class="text-4xl font-bold text-red-900 mt-2">{{ out_of_stock_count }}</p>
+        </div>
+    </div>
+
+    <div class="mt-8">
+        <a href="{% url 'admin:index' %}" 
+           class="inline-block bg-gray-700 text-white text-center py-3 px-6 rounded-lg hover:bg-gray-800 transition">
+            <i class="fas fa-tools mb-1"></i> Admin Panel
+        </a>
+    </div>
+</div>
+{% endblock %}

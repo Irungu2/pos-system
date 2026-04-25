@@ -1,0 +1,93 @@
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Report Filters</h5>
+    </div>
+    <div class="card-body">
+        <form id="reportFiltersForm">
+            <div class="row g-3">
+                <!-- Store Filter -->
+                <div class="col-md-4">
+                    <label class="form-label">Store</label>
+                    <select name="store_id" class="form-select">
+                        <option value="">All Stores</option>
+                        {% for store in stores %}
+                        <option value="{{ store.id }}">{{ store.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Date Range -->
+                <div class="col-md-4">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" name="start_date" class="form-control">
+                </div>
+                
+                <div class="col-md-4">
+                    <label class="form-label">End Date</label>
+                    <input type="date" name="end_date" class="form-control">
+                </div>
+                
+                <!-- Product Filter -->
+                <div class="col-md-6">
+                    <label class="form-label">Product</label>
+                    <select name="product_id" class="form-select">
+                        <option value="">All Products</option>
+                        {% for product in products %}
+                        <option value="{{ product.id }}">{{ product.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Category Filter -->
+                <div class="col-md-6">
+                    <label class="form-label">Category</label>
+                    <select name="category_id" class="form-select">
+                        <option value="">All Categories</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}">{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Cashier Filter -->
+                <div class="col-md-6">
+                    <label class="form-label">Cashier</label>
+                    <select name="cashier_id" class="form-select">
+                        <option value="">All Cashiers</option>
+                        {% for cashier in cashiers %}
+                        <option value="{{ cashier.id }}">{{ cashier.get_full_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Report Type -->
+                <div class="col-md-6">
+                    <label class="form-label">Report Type</label>
+                    <select name="report_type" class="form-select" id="reportTypeSelect">
+                        <option value="SALES_SUMMARY">Sales Summary</option>
+                        <option value="PRODUCT_SALES">Product Sales</option>
+                        <option value="CASHIER_PERFORMANCE">Cashier Performance</option>
+                        <option value="TAX_REPORT">Tax Report</option>
+                        <option value="SALES_VS_STOCK">Sales vs Stock</option>
+                        <option value="CATEGORY_PROFITABILITY">Category Profitability</option>
+                        <option value="END_OF_DAY">End of Day</option>
+                    </select>
+                </div>
+                
+                <!-- Additional filters based on report type -->
+                <div class="col-12" id="additionalFilters">
+                    <!-- Additional filters will be loaded here based on report type -->
+                </div>
+            </div>
+            
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-filter"></i> Generate Report
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="resetFilters()">
+                    <i class="bi bi-arrow-clockwise"></i> Reset
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

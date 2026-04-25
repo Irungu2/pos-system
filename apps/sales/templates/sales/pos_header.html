@@ -1,0 +1,27 @@
+<!-- templates/sales/pos_header.html -->
+<div class="bg-white shadow-sm border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center py-4">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-cash-register mr-3 text-green-600"></i>
+                    Point of Sale
+                </h1>
+                <p class="text-sm text-gray-600 flex items-center mt-1">
+                    <i class="fas fa-user mr-2"></i>Welcome, {{ user.first_name }} • 
+                    <i class="fas fa-clock ml-3 mr-2"></i>
+                    <span id="current-time">{{ current_time|time:"H:i" }}</span>
+                </p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="hidden sm:block text-right">
+                    <p class="text-sm text-gray-600">Products Available</p>
+                    <p class="text-lg font-semibold text-gray-900" id="products-count">Loading...</p>
+                </div>
+                <a href="{% url 'dashboard' %}" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition duration-200 flex items-center">
+                    <i class="fas fa-arrow-left mr-2"></i>Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

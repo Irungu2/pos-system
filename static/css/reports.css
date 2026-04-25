@@ -1,0 +1,130 @@
+/* static/css/reports.css */
+/* Additional CSS for reports page */
+
+/* Print styles */
+@media print {
+    .sidebar, .topbar, .footer, .quick-reports, .nav-tabs, .action-buttons {
+        display: none !important;
+    }
+    
+    .content {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    .report-card {
+        box-shadow: none !important;
+        border: 1px solid #000 !important;
+    }
+    
+    .table th {
+        background-color: #000 !important;
+        color: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    a[href]:after {
+        content: " (" attr(href) ")";
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --primary-color: #5a6ee6;
+        --secondary-color: #4b3a93;
+        --light-color: #343a40;
+        --dark-color: #f8f9fa;
+        --border-color: #495057;
+        --shadow-color: rgba(0, 0, 0, 0.3);
+    }
+    
+    .reports-container {
+        background: linear-gradient(135deg, #212529 0%, #343a40 100%);
+    }
+    
+    .report-card, .summary-card {
+        background: #2d3748;
+        color: #e2e8f0;
+    }
+    
+    .form-control, .form-select {
+        background-color: #374151;
+        border-color: #4b5563;
+        color: #e5e7eb;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        background-color: #374151;
+        color: #e5e7eb;
+    }
+    
+    .quick-report-btn {
+        background: #374151;
+        border-color: #4b5563;
+        color: #e5e7eb;
+    }
+    
+    .table {
+        color: #e5e7eb;
+    }
+    
+    .table th {
+        background-color: #374151;
+    }
+    
+    .table td {
+        border-color: #4b5563;
+    }
+    
+    .pre-code {
+        background: #1f2937;
+        border-color: #374151;
+        color: #e5e7eb;
+    }
+}
+
+/* Animation for report loading */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+#reportResult:not(.d-none) {
+    animation: fadeIn 0.5s ease-out;
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Focus styles for accessibility */
+button:focus, 
+input:focus, 
+select:focus {
+    outline: 3px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .report-card {
+        border: 3px solid #000;
+    }
+    
+    .btn-primary {
+        border: 2px solid #000;
+    }
+}

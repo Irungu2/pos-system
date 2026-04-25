@@ -1,0 +1,485 @@
+{% extends "inventory/inventory_base.html" %}
+
+{% block title %}Products Management{% endblock %}
+
+{% block content %}
+<h2>Products Management</h2>
+
+<!-- Error Display -->
+<div class="error" id="error" style="color:red; margin-bottom:1em;"></div>
+<div class="success" id="success" style="color:green; margin-bottom:1em; display:none;"></div>
+
+<!-- Search & Filters -->
+<div class="filters" style="margin-bottom:1em; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+    <input type="text" id="search-input" placeholder="Search products..." style="flex:2; padding:8px;">
+    <select id="category-filter" style="flex:1; padding:8px;">
+        <option value="">All Categories</option>
+    </select>
+    <select id="stock-status-filter" style="flex:1; padding:8px;">
+        <option value="">All Stock</option>
+        <option value="in_stock">In Stock</option>
+        <option value="low_stock">Low Stock</option>
+        <option value="out_of_stock">Out of Stock</option>
+    </select>
+    <select id="status-filter" style="flex:1; padding:8px;">
+        <option value="">All Status</option>
+        <option value="true">Active</option>
+        <option value="false">Inactive</option>
+    </select>
+</div>
+
+<!-- Stats Cards -->
+<div class="stats-cards" style="display:flex; gap:1em; margin-bottom:1em;">
+    <div class="card" style="padding:1em; background:#f0f0f0; border-radius:5px; flex:1; text-align:center;">
+        <div>Total Products</div>
+        <strong id="total-products">0</strong>
+    </div>
+    <div class="card" style="padding:1em; background:#f0f0f0; border-radius:5px; flex:1; text-align:center;">
+        <div>Low Stock</div>
+        <strong id="low-stock-count">0</strong>
+    </div>
+    <div class="card" style="padding:1em; background:#f0f0f0; border-radius:5px; flex:1; text-align:center;">
+        <div>Out of Stock</div>
+        <strong id="out-of-stock-count">0</strong>
+    </div>
+</div>
+
+<!-- Action Buttons -->
+<div style="margin-bottom:1em; display:flex; gap:10px;">
+    <button id="new-product-btn" style="background:#007bff; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">
+        New Product
+    </button>
+    <button id="print-barcodes-btn" style="background:#17a2b8; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">
+        🖨️ Print Barcodes
+    </button>
+</div>
+
+<!-- Products Table -->
+<div style="overflow-x:auto;">
+    <table border="1" style="width:100%; margin-top:1em; border-collapse:collapse;">
+        <thead>
+            <tr style="background:#f8f9fa;">
+                <th style="padding:10px; text-align:center; width:40px;">
+                    <input type="checkbox" id="select-all-products">
+                </th>
+                <th style="padding:10px; text-align:left;">Product</th>
+                <th style="padding:10px; text-align:left;">Barcode</th>
+                <th style="padding:10px; text-align:left;">Category</th>
+                <th style="padding:10px; text-align:left;">Price</th>
+                <th style="padding:10px; text-align:left;">Stock</th>
+                <th style="padding:10px; text-align:left;">Reorder Level</th>
+                <th style="padding:10px; text-align:left;">Stock Status</th>
+                <th style="padding:10px; text-align:left;">Status</th>
+                <th style="padding:10px; text-align:left;">Created Date</th>
+                <th style="padding:10px; text-align:left;">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="products-table-body">
+            <tr>
+                <td colspan="11" style="padding:40px; text-align:center;">
+                    Loading products...
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+<div class="pagination" style="margin-top:1em; display:flex; justify-content:center; align-items:center; gap:10px;">
+    <button id="prev-page" style="padding:5px 15px; background:#6c757d; color:white; border:none; border-radius:3px; cursor:pointer;">Prev</button>
+    <span id="page-info" style="padding:5px 10px;">Page 1</span>
+    <button id="next-page" style="padding:5px 15px; background:#6c757d; color:white; border:none; border-radius:3px; cursor:pointer;">Next</button>
+</div>
+
+<!-- Product Modal (SKU and Barcode REMOVED) -->
+<div id="product-modal" style="display:none; position:fixed; top:5%; left:50%; transform:translateX(-50%); background:#fff; border:1px solid #ccc; padding:2em; z-index:1001; width:90%; max-width:800px; border-radius:5px; box-shadow:0 4px 20px rgba(0,0,0,0.15);">
+    <h3 id="product-modal-title" style="margin-top:0; margin-bottom:1em;">New Product</h3>
+    <div class="form-error" id="product-form-error" style="color:red; margin-bottom:1em; display:none;"></div>
+    
+    <form id="product-form">
+        {% csrf_token %}
+        <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:1em; margin-bottom:1em;">
+            <!-- Column 1 -->
+            <div>
+                <div style="margin-bottom:1em;">
+                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Product Name *</label>
+                    <input type="text" id="product-name" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:3px;" required>
+                    <small style="color:#666;">Enter product name (2-200 characters)</small>
+                </div>
+                
+                <div style="margin-bottom:1em;">
+                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Category *</label>
+                    <select id="product-category" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:3px;" required>
+                        <option value="">Select Category</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Column 2 -->
+            <div>
+                <div style="margin-bottom:1em;">
+                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Cost Price ($)</label>
+                    <input type="number" id="cost-price" step="0.01" min="0" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:3px;">
+                </div>
+                
+                <div style="margin-bottom:1em;">
+                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Selling Price ($) *</label>
+                    <input type="number" id="selling-price" step="0.01" min="0" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:3px;" required>
+                </div>
+                
+                <div style="margin-bottom:1em;">
+                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Reorder Level</label>
+                    <input type="number" id="reorder-level" min="0" value="10" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:3px;">
+                    <small style="color:#666;">Alert when stock falls below this level</small>
+                </div>
+                
+                <div style="margin-bottom:1em;">
+                    <label style="display:block; margin-bottom:5px; cursor:pointer;">
+                        <input type="checkbox" id="is-active" checked style="margin-right:8px;">
+                        <span style="font-weight:bold;">Active Product</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Full width row -->
+        <div style="margin-top:1em; margin-bottom:1em;">
+            <div style="margin-bottom:1em;">
+                <label style="display:block; margin-bottom:5px; font-weight:bold;">Description</label>
+                <textarea id="product-description" rows="3" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:3px;" maxlength="500"></textarea>
+                <div style="font-size:12px; color:#666; text-align:right;" id="char-count">0/500 characters</div>
+            </div>
+        </div>
+
+        <!-- Info Box: Auto-generation message -->
+        <div style="margin-bottom:1em; padding:10px; background:#e7f3ff; border-radius:5px; border-left:4px solid #2196F3;">
+            <small style="color:#555;">
+                ℹ️ <strong>SKU</strong> and <strong>Barcode</strong> will be automatically generated when you save.
+                You can view them in the products list after creation.
+            </small>
+        </div>
+
+        <div style="margin-top:1em; display:flex; gap:10px; align-items:center;">
+            <button type="button" id="product-submit" style="background:#28a745; color:white; border:none; padding:8px 20px; border-radius:3px; cursor:pointer;">
+                Save Product
+            </button>
+            <button type="button" id="product-cancel" style="background:#6c757d; color:white; border:none; padding:8px 20px; border-radius:3px; cursor:pointer;">
+                Cancel
+            </button>
+            <span id="product-loading" style="display:none; margin-left:10px; color:#666;">Processing...</span>
+        </div>
+    </form>
+</div>
+
+<!-- Stock Update Modal -->
+<div id="stock-modal" style="display:none; position:fixed; top:10%; left:50%; transform:translateX(-50%); background:#fff; border:1px solid #ccc; padding:2em; z-index:1001; width:500px; max-width:90%; border-radius:5px; box-shadow:0 4px 20px rgba(0,0,0,0.15);">
+    <h3 style="margin-top:0; margin-bottom:1em;">Update Stock</h3>
+    <div class="form-error" id="stock-form-error" style="color:red; margin-bottom:1em; display:none;"></div>
+    
+    <div style="margin-bottom:1em;">
+        <div id="stock-product-info" style="font-weight:bold; margin-bottom:1em; padding:10px; background:#f8f9fa; border-radius:3px;"></div>
+        
+        <div style="margin-bottom:1em;">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Select Store *</label>
+            <select id="store-select" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:3px;" required>
+                <option value="">Select Store</option>
+            </select>
+        </div>
+        
+        <div style="margin-bottom:1em;">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Action *</label>
+            <select id="stock-action" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:3px;" required>
+                <option value="set">Set to quantity</option>
+                <option value="add">Add to stock</option>
+                <option value="subtract">Subtract from stock</option>
+            </select>
+        </div>
+        
+        <div style="margin-bottom:1em;">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Quantity *</label>
+            <input type="number" id="quantity-input" min="1" value="1" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:3px;" required>
+        </div>
+        
+        <div style="margin-bottom:1em;">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Notes</label>
+            <textarea id="stock-notes" rows="2" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:3px;"></textarea>
+        </div>
+    </div>
+
+    <div style="display:flex; gap:10px; align-items:center;">
+        <button type="button" id="update-stock-btn" style="background:#007bff; color:white; border:none; padding:8px 20px; border-radius:3px; cursor:pointer;">
+            Update Stock
+        </button>
+        <button type="button" id="close-stock-modal" style="background:#6c757d; color:white; border:none; padding:8px 20px; border-radius:3px; cursor:pointer;">
+            Close
+        </button>
+        <span id="stock-loading" style="display:none; margin-left:10px; color:#666;">Updating...</span>
+    </div>
+</div>
+
+<!-- Load JS -->
+{% load static %}
+<script src="{% static 'js/inventory/products.js' %}?v=1.0"></script>
+
+<style>
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        display: inline-block;
+    }
+    
+    .status-active {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .status-inactive {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .status-in-stock {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .status-low-stock {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+    
+    .status-out-stock {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .btn-edit, .btn-delete, .btn-stock, .btn-barcode {
+        padding: 4px 12px;
+        margin: 0 2px;
+        border-radius: 3px;
+        cursor: pointer;
+        border: none;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    
+    .btn-edit {
+        background: #28a745;
+        color: white;
+    }
+    
+    .btn-edit:hover {
+        background: #218838;
+    }
+    
+    .btn-delete {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .btn-delete:hover {
+        background: #c82333;
+    }
+    
+    .btn-delete:disabled {
+        background: #e0a3a9;
+        cursor: not-allowed;
+    }
+    
+    .btn-stock {
+        background: #007bff;
+        color: white;
+    }
+    
+    .btn-stock:hover {
+        background: #0056b3;
+    }
+    
+    .btn-barcode {
+        background: #17a2b8;
+        color: white;
+    }
+    
+    .btn-barcode:hover {
+        background: #138496;
+    }
+    
+    table {
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+    
+    th {
+        background: #f8f9fa;
+        padding: 10px;
+        text-align: left;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    td {
+        padding: 8px 10px;
+        border-top: 1px solid #dee2e6;
+    }
+    
+    tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .modal-backdrop {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+    }
+    
+    .modal-backdrop.active {
+        display: block;
+    }
+    
+    button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .barcode-cell {
+        font-family: monospace;
+        font-size: 12px;
+        max-width: 120px;
+        word-break: break-all;
+    }
+    
+    @media (max-width: 768px) {
+        .filters {
+            flex-direction: column;
+        }
+        
+        .stats-cards {
+            flex-direction: column;
+        }
+        
+        #product-modal {
+            width: 95%;
+            top: 2%;
+            padding: 1em;
+        }
+        
+        #product-modal > div {
+            grid-template-columns: 1fr;
+        }
+        
+        #stock-modal {
+            width: 95%;
+        }
+        
+        table {
+            font-size: 12px;
+        }
+        
+        .btn-edit, .btn-delete, .btn-stock, .btn-barcode {
+            padding: 3px 8px;
+            margin: 1px;
+            font-size: 11px;
+        }
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Character counter for description
+    const description = document.getElementById('product-description');
+    const charCount = document.getElementById('char-count');
+    
+    if (description && charCount) {
+        description.addEventListener('input', function() {
+            charCount.textContent = this.value.length + '/500 characters';
+        });
+        charCount.textContent = description.value.length + '/500 characters';
+    }
+    
+    // Modal backdrop functions
+    function createBackdrop() {
+        let backdrop = document.querySelector('.modal-backdrop');
+        if (!backdrop) {
+            backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop';
+            backdrop.addEventListener('click', function() {
+                hideAllModals();
+            });
+            document.body.appendChild(backdrop);
+        }
+        return backdrop;
+    }
+    
+    function showModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'block';
+            createBackdrop().classList.add('active');
+        }
+    }
+    
+    function hideModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) {
+            backdrop.classList.remove('active');
+        }
+    }
+    
+    function hideAllModals() {
+        document.querySelectorAll('[id$="-modal"]').forEach(modal => {
+            modal.style.display = 'none';
+        });
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) {
+            backdrop.classList.remove('active');
+        }
+    }
+    
+    // Modal event listeners
+    const newProductBtn = document.getElementById('new-product-btn');
+    const productCancelBtn = document.getElementById('product-cancel');
+    const closeStockModalBtn = document.getElementById('close-stock-modal');
+    
+    if (newProductBtn) {
+        newProductBtn.addEventListener('click', function() {
+            showModal('product-modal');
+        });
+    }
+    
+    if (productCancelBtn) {
+        productCancelBtn.addEventListener('click', function() {
+            hideModal('product-modal');
+        });
+    }
+    
+    if (closeStockModalBtn) {
+        closeStockModalBtn.addEventListener('click', function() {
+            hideModal('stock-modal');
+        });
+    }
+    
+    // Close modals with Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            hideAllModals();
+        }
+    });
+});
+</script>
+
+{% endblock %}

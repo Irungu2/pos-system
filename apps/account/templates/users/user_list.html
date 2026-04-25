@@ -1,0 +1,656 @@
+{% extends "inventory/inventory_base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="user-management-container">
+    <div class="page-header">
+        <div class="header-left">
+            <h1 class="page-title">
+                <i class="fas fa-users-cog"></i> User Management
+            </h1>
+            <p class="page-subtitle">Manage system users, roles, and permissions</p>
+        </div>
+        <div class="header-right">
+            <a href="{% url 'user_create' %}" class="btn-add-user">
+                <i class="fas fa-plus-circle"></i> Add New User
+            </a>
+        </div>
+    </div>
+    
+    {% if messages %}
+        <div class="messages-container">
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    <i class="fas {% if message.tags == 'success' %}fa-check-circle{% elif message.tags == 'error' %}fa-exclamation-circle{% else %}fa-info-circle{% endif %}"></i>
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    
+    <!-- Search and Filter Bar -->
+    <div class="search-filter-bar">
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" placeholder="Search by name or ID..." class="search-input">
+        </div>
+        <div class="filter-box">
+            <select id="roleFilter" class="filter-select">
+                <option value="all">All Roles</option>
+                <option value="admin">Admin</option>
+                <option value="manager">Manager</option>
+                <option value="sales">Sales</option>
+                <option value="cashier">Cashier</option>
+            </select>
+            <select id="statusFilter" class="filter-select">
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+            </select>
+        </div>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="user-table" id="userTable">
+            <thead>
+                <tr>
+                    <th>Unique ID</th>
+                    <th>Full Name</th>
+                    <th>Role</th>
+                    <th>Date Joined</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr class="user-row" data-role="{{ user.role }}" data-status="{% if user.is_active %}active{% else %}inactive{% endif %}">
+                    <td class="user-id">
+                        <span class="id-badge">{{ user.unique_id }}</span>
+                    </td>
+                    <td class="user-name">
+                        <div class="user-avatar">
+                            <span>{{ user.get_full_name|first|upper }}</span>
+                        </div>
+                        <div class="user-info">
+                            <div class="user-fullname">{{ user.get_full_name }}</div>
+                            {% if user.email %}
+                            <div class="user-email">{{ user.email }}</div>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="role-badge role-{{ user.role }}">
+                            <i class="fas {% if user.role == 'admin' %}fa-shield-alt{% elif user.role == 'manager' %}fa-chart-line{% elif user.role == 'sales' %}fa-chart-simple{% else %}fa-cash-register{% endif %}"></i>
+                            {{ user.get_role_display }}
+                        </span>
+                    </td>
+                    <td class="date-joined">
+                        <i class="far fa-calendar-alt"></i>
+                        {{ user.date_joined|date:"Y-m-d" }}
+                        <small>{{ user.date_joined|date:"H:i" }}</small>
+                    </td>
+                    <td>
+                        <span class="status-badge status-{% if user.is_active %}active{% else %}inactive{% endif %}">
+                            <i class="fas {% if user.is_active %}fa-circle{% else %}fa-circle{% endif %}"></i>
+                            {% if user.is_active %}Active{% else %}Inactive{% endif %}
+                        </span>
+                    </td>
+                    <td class="action-buttons">
+                        <a href="{% url 'user_update' user.pk %}" class="action-btn edit-btn" title="Edit User">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        <a href="{% url 'user_delete' user.pk %}" class="action-btn delete-btn" title="Delete User" onclick="return confirmDelete('{{ user.get_full_name }}')">
+                            <i class="fas fa-trash-alt"></i> Delete
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="empty-state">
+                        <i class="fas fa-users-slash"></i>
+                        <h3>No Users Found</h3>
+                        <p>Get started by creating your first user.</p>
+                        <a href="{% url 'user_create' %}" class="btn-create-first">
+                            <i class="fas fa-plus-circle"></i> Create First User
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Stats Footer -->
+    <div class="table-footer">
+        <div class="stats-info">
+            <span><i class="fas fa-users"></i> Total Users: <strong>{{ users|length }}</strong></span>
+            <span><i class="fas fa-user-shield"></i> Admins: <strong>{{ users|length|default:0 }}</strong></span>
+        </div>
+        <div class="table-info">
+            Showing <span id="visibleCount">{{ users|length }}</span> of <span id="totalCount">{{ users|length }}</span> users
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Main Container */
+    .user-management-container {
+        padding: 1.5rem;
+        background: #f8f9fa;
+        min-height: calc(100vh - 60px);
+    }
+    
+    /* Page Header */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding: 1.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 15px;
+        color: white;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+    
+    .page-title {
+        font-size: 1.8rem;
+        font-weight: 600;
+        margin: 0 0 0.5rem 0;
+    }
+    
+    .page-title i {
+        margin-right: 10px;
+    }
+    
+    .page-subtitle {
+        margin: 0;
+        opacity: 0.9;
+        font-size: 0.9rem;
+    }
+    
+    .btn-add-user {
+        background: white;
+        color: #667eea;
+        padding: 10px 20px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .btn-add-user:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        color: #764ba2;
+        text-decoration: none;
+    }
+    
+    /* Messages */
+    .messages-container {
+        margin-bottom: 1.5rem;
+    }
+    
+    .alert {
+        padding: 1rem 1.5rem;
+        border-radius: 10px;
+        border: none;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    
+    .alert-success {
+        background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+        color: #155724;
+    }
+    
+    .alert-danger, .alert-error {
+        background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+        color: #721c24;
+    }
+    
+    /* Search and Filter Bar */
+    .search-filter-bar {
+        background: white;
+        padding: 1rem 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .search-box {
+        flex: 2;
+        position: relative;
+        min-width: 250px;
+    }
+    
+    .search-box i {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #999;
+    }
+    
+    .search-input {
+        width: 100%;
+        padding: 10px 15px 10px 40px;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+    }
+    
+    .search-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+    }
+    
+    .filter-box {
+        flex: 1;
+        display: flex;
+        gap: 0.5rem;
+        min-width: 250px;
+    }
+    
+    .filter-select {
+        flex: 1;
+        padding: 10px 15px;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        background: white;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .filter-select:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+    
+    /* Table Styles */
+    .user-table {
+        width: 100%;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    .user-table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    .user-table th {
+        padding: 1rem 1.5rem;
+        font-weight: 600;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .user-table td {
+        padding: 1rem 1.5rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .user-row:hover {
+        background: #f8f9ff;
+        transition: all 0.3s ease;
+    }
+    
+    /* User ID Badge */
+    .id-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        background: #f0f0f0;
+        border-radius: 6px;
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: #667eea;
+    }
+    
+    /* User Name Column */
+    .user-name {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+    
+    .user-info {
+        flex: 1;
+    }
+    
+    .user-fullname {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 4px;
+    }
+    
+    .user-email {
+        font-size: 0.8rem;
+        color: #999;
+    }
+    
+    /* Role Badges */
+    .role-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    
+    .role-admin {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+    }
+    
+    .role-manager {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        color: #333;
+    }
+    
+    .role-sales {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        color: white;
+    }
+    
+    .role-cashier {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        color: #333;
+    }
+    
+    /* Status Badges */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    
+    .status-active {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .status-inactive {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .status-badge i {
+        font-size: 0.6rem;
+    }
+    
+    .status-active i {
+        color: #28a745;
+    }
+    
+    .status-inactive i {
+        color: #dc3545;
+    }
+    
+    /* Date Joined */
+    .date-joined {
+        font-size: 0.9rem;
+    }
+    
+    .date-joined i {
+        margin-right: 5px;
+        color: #999;
+    }
+    
+    .date-joined small {
+        display: block;
+        font-size: 0.7rem;
+        color: #999;
+        margin-top: 2px;
+    }
+    
+    /* Action Buttons */
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+    }
+    
+    .action-btn {
+        padding: 5px 12px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 0.85rem;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .edit-btn {
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+    
+    .edit-btn:hover {
+        background: #1976d2;
+        color: white;
+        text-decoration: none;
+        transform: translateY(-2px);
+    }
+    
+    .delete-btn {
+        background: #ffebee;
+        color: #dc3545;
+    }
+    
+    .delete-btn:hover {
+        background: #dc3545;
+        color: white;
+        text-decoration: none;
+        transform: translateY(-2px);
+    }
+    
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+    }
+    
+    .empty-state i {
+        font-size: 4rem;
+        color: #ddd;
+        margin-bottom: 1rem;
+    }
+    
+    .empty-state h3 {
+        color: #666;
+        margin-bottom: 0.5rem;
+    }
+    
+    .empty-state p {
+        color: #999;
+        margin-bottom: 1.5rem;
+    }
+    
+    .btn-create-first {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 8px;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-create-first:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102,126,234,0.3);
+        color: white;
+        text-decoration: none;
+    }
+    
+    /* Table Footer */
+    .table-footer {
+        margin-top: 1.5rem;
+        padding: 1rem;
+        background: white;
+        border-radius: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .stats-info {
+        display: flex;
+        gap: 1.5rem;
+    }
+    
+    .stats-info span {
+        font-size: 0.9rem;
+        color: #666;
+    }
+    
+    .stats-info i {
+        margin-right: 5px;
+    }
+    
+    .table-info {
+        font-size: 0.85rem;
+        color: #999;
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .user-management-container {
+            padding: 1rem;
+        }
+        
+        .page-header {
+            flex-direction: column;
+            text-align: center;
+            gap: 1rem;
+        }
+        
+        .search-filter-bar {
+            flex-direction: column;
+        }
+        
+        .filter-box {
+            flex-direction: column;
+        }
+        
+        .action-buttons {
+            flex-direction: column;
+        }
+        
+        .user-table {
+            font-size: 0.85rem;
+        }
+        
+        .user-table th,
+        .user-table td {
+            padding: 0.75rem;
+        }
+        
+        .table-footer {
+            flex-direction: column;
+            text-align: center;
+        }
+        
+        .stats-info {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+    }
+</style>
+
+<script>
+    // Search and Filter functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('searchInput');
+        const roleFilter = document.getElementById('roleFilter');
+        const statusFilter = document.getElementById('statusFilter');
+        const table = document.getElementById('userTable');
+        const rows = table.getElementsByTagName('tr');
+        const visibleCountSpan = document.getElementById('visibleCount');
+        const totalCountSpan = document.getElementById('totalCount');
+        
+        function filterTable() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const roleValue = roleFilter.value;
+            const statusValue = statusFilter.value;
+            let visibleCount = 0;
+            
+            for (let i = 1; i < rows.length; i++) { // Start from 1 to skip header
+                const row = rows[i];
+                if (row.classList.contains('user-row')) {
+                    const userId = row.querySelector('.id-badge')?.innerText.toLowerCase() || '';
+                    const userName = row.querySelector('.user-fullname')?.innerText.toLowerCase() || '';
+                    const userRole = row.getAttribute('data-role') || '';
+                    const userStatus = row.getAttribute('data-status') || '';
+                    
+                    const matchesSearch = userId.includes(searchTerm) || userName.includes(searchTerm);
+                    const matchesRole = roleValue === 'all' || userRole === roleValue;
+                    const matchesStatus = statusValue === 'all' || userStatus === statusValue;
+                    
+                    if (matchesSearch && matchesRole && matchesStatus) {
+                        row.style.display = '';
+                        visibleCount++;
+                    } else {
+                        row.style.display = 'none';
+                    }
+                }
+            }
+            
+            visibleCountSpan.textContent = visibleCount;
+        }
+        
+        searchInput.addEventListener('keyup', filterTable);
+        roleFilter.addEventListener('change', filterTable);
+        statusFilter.addEventListener('change', filterTable);
+        
+        // Update total count
+        const totalRows = document.querySelectorAll('.user-row').length;
+        totalCountSpan.textContent = totalRows;
+        visibleCountSpan.textContent = totalRows;
+    });
+    
+    // Confirm delete function
+    function confirmDelete(userName) {
+        return confirm(`Are you sure you want to delete user "${userName}"? This action cannot be undone.`);
+    }
+</script>
+{% endblock %}
