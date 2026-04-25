@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
 
-# Default port if not provided
+echo "START SCRIPT RUNNING ON PORT=$PORT"
+
 PORT=${PORT:-8000}
 
 python manage.py migrate --noinput
