@@ -35,6 +35,6 @@ python-barcode==0.14.0
 reportlab==3.6.12
 
 # Django Filters for filtering in DRF
-django-filter==23.2
+django-filter==25.2
 
 # Any other dependencies that you might be using should also be included.
