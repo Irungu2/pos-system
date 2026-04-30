@@ -21,9 +21,15 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 # Parse allowed hosts from environment variable
 # ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
 ALLOWED_HOSTS = ["*"]
+# ALLOWED_HOSTS=localhost,127.0.0.1,pos-system.<random-string>.up.railway.app,192.168.100.40,hemston.pythonanywhere.com
+
 # ALLOWED_HOSTS = ['*']
 # ALLOWED_HOSTS = ['hemston.pythonanywhere.com', '127.0.0.1', 'localhost']
-
+# ALLOWED_HOSTS = [
+#     "vision2.pythonanywhere.com",
+#     "127.0.0.1",
+#     "localhost",
+# ]
 # Application definition
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -141,13 +147,9 @@ CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'False') == 'True'
 CSRF_COOKIE_PATH = '/'
-# CSRF_TRUSTED_ORIGINS = [
-#     'http://localhost:8000',
-#     'http://127.0.0.1:8000',
-#     'http://localhost:3000',
-# ]
+
+
 CSRF_TRUSTED_ORIGINS = [
-    "https://pos-system-production-cf86.up.railway.app",
     "https://pos-system-production-cf86.up.railway.app",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
