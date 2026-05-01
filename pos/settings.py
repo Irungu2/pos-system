@@ -24,13 +24,8 @@ ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
 # ALLOWED_HOSTS = ["pos-system-mlkn.onrender.com"]
 # ALLOWED_HOSTS=localhost,127.0.0.1,pos-system.<random-string>.up.railway.app,192.168.100.40,hemston.pythonanywhere.com
 
-# ALLOWED_HOSTS = ['*']
-# ALLOWED_HOSTS = ['hemston.pythonanywhere.com', '127.0.0.1', 'localhost']
-# ALLOWED_HOSTS = [
-#     "vision2.pythonanywhere.com",
-#     "127.0.0.1",
-#     "localhost",
-# ]
+
+
 # Application definition
 INSTALLED_APPS = [
     "django.contrib.admin",
