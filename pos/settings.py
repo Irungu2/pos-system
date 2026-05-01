@@ -19,8 +19,9 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 # Parse allowed hosts from environment variable
-# ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
+# ALLOWED_HOSTS = ["*"]
+# ALLOWED_HOSTS = ["pos-system-mlkn.onrender.com"]
 # ALLOWED_HOSTS=localhost,127.0.0.1,pos-system.<random-string>.up.railway.app,192.168.100.40,hemston.pythonanywhere.com
 
 # ALLOWED_HOSTS = ['*']
