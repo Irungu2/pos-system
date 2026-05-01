@@ -8,7 +8,7 @@ import logging
 # =========================
 # Third-Party Imports
 # =========================
-import pandas as pd
+# import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill
 
