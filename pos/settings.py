@@ -13,10 +13,15 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
+# SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
+
+
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 
+if not SECRET_KEY:
+    raise Exception("DJANGO_SECRET_KEY is missing in environment variables")
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'False') == 'True'
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
 # Parse allowed hosts from environment variable
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
@@ -27,19 +32,14 @@ ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
 
 
 # Application definition
-INSTALLED_APPS = [
-    "django.contrib.admin",
-    "django.contrib.auth",
-    "django.contrib.contenttypes",
-    "django.contrib.sessions",
-    "django.contrib.messages",
-    "django.contrib.staticfiles",
-    'django.contrib.humanize',
-    "apps.home",
-    "apps.account",
-    "apps.inventory",
-    "apps.sales",
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv(
+        'ALLOWED_HOSTS',
+        'pos-system-mlkn.onrender.com,localhost,127.0.0.1'
+    ).split(',')
 ]
+
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -146,11 +146,10 @@ CSRF_COOKIE_PATH = '/'
 
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://pos-system-production-cf86.up.railway.app",
+    "https://pos-system-mlkn.onrender.com",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
 ]
-
 
 # CORS settings
 CORS_ALLOW_CREDENTIALS = True
