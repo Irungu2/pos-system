@@ -113,13 +113,123 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_protect
 
+# @csrf_protect
+# def login_view(request):
+#     if request.user.is_authenticated:
+#         return redirect("dashboard")
+
+#     form = LoginForm(request.POST or None)
+#     stores = None  # 👈 for modal
+
+#     if request.method == "POST" and form.is_valid():
+#         unique_id = form.cleaned_data["unique_id"]
+#         password = form.cleaned_data["password"]
+
+#         user = authenticate(request, unique_id=unique_id, password=password)
+
+#         if user is None:
+#             messages.error(request, "Invalid credentials.")
+#             return render(request, "auth/login.html", {
+#                 "form": form,
+#                 "stores": None
+#             })
+
+#         login(request, user)
+
+#         # session setup
+#         request.session["role"] = user.role
+#         request.session.set_expiry(60 * 60 * 4)
+
+#         # 🔥 GET ALL STORES (retail + warehouse)
+#         user_stores = user.stores.all()
+
+#         print("\n[LOGIN DEBUG] User:", user)
+#         print("[LOGIN DEBUG] Total stores:", user_stores.count())
+
+#         for s in user_stores:
+#             print(f"[STORE] {s.name} | {s.store_type}")
+
+#         # ❌ No stores
+#         if not user_stores.exists():
+#             messages.error(request, "No store assigned.")
+#             return redirect("login")
+
+#         # ✅ One store → auto login
+#         if user_stores.count() == 1:
+#             store = user_stores.first()
+#             request.session["store_id"] = store.id
+#             request.session["store_type"] = store.store_type
+#             return redirect("dashboard")
+
+#         # 🔥 Multiple stores → show modal (NOT redirect)
+#         stores = user_stores
+
+#     return render(request, "auth/login.html", {
+#         "form": form,
+#         "stores": stores  # 👈 modal will use this
+#     })
+
+
+
+# @login_required
+# def set_store(request):
+
+#     if request.method == "POST":
+
+#         store_id = request.POST.get("store_id")
+
+#         print("Selected store:", store_id)
+
+#         # only allow user's stores
+#         store = request.user.stores.filter(id=store_id).first()
+
+#         if not store:
+#             messages.error(request, "Invalid store selected.")
+#             return redirect("dashboard")
+
+#         # save session
+#         request.session["store_id"] = str(store.id)
+#         request.session["store_name"] = store.name
+#         request.session["store_type"] = store.store_type
+
+#         print("Current store:", store.name)
+
+#         messages.success(
+#             request,
+#             f"Switched to {store.name}"
+#         )
+
+#         return redirect(request.META.get("HTTP_REFERER", "dashboard"))
+
+#     return redirect("dashboard")
+
 @csrf_protect
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect("dashboard")
+        # Check if user already has a store selected
+        if request.session.get("store_id"):
+            return redirect("dashboard")
+        
+        # If logged in but no store selected, check their stores
+        user_stores = request.user.stores.all()
+        if user_stores.exists():
+            if user_stores.count() == 1:
+                # Auto-select single store
+                store = user_stores.first()
+                request.session["store_id"] = store.id
+                request.session["store_type"] = store.store_type
+                return redirect("dashboard")
+            else:
+                # Multiple stores - show modal
+                return render(request, "auth/login.html", {
+                    "form": LoginForm(),
+                    "stores": user_stores
+                })
+        else:
+            messages.error(request, "No store assigned.")
+            return redirect("logout")
 
     form = LoginForm(request.POST or None)
-    stores = None  # 👈 for modal
 
     if request.method == "POST" and form.is_valid():
         unique_id = form.cleaned_data["unique_id"]
@@ -161,67 +271,46 @@ def login_view(request):
             request.session["store_type"] = store.store_type
             return redirect("dashboard")
 
-        # 🔥 Multiple stores → show modal (NOT redirect)
-        stores = user_stores
+        # 🔥 Multiple stores → show modal (NOT redirect) - THIS IS THE KEY FIX
+        return render(request, "auth/login.html", {
+            "form": LoginForm(),  # Reset form
+            "stores": user_stores  # 👈 modal will show here
+        })
 
     return render(request, "auth/login.html", {
         "form": form,
-        "stores": stores  # 👈 modal will use this
-    })
-
-
-# @login_required
-# def set_store(request):
-#     if request.method == "POST":
-#         store_id = request.POST.get("store_id")
-
-#         store = request.user.stores.filter(id=store_id).first()
-#         print('the store id is ', store_id)
-#         if not store:
-#             return redirect("login")
-
-#         request.session["store_id"] = store.id
-#         request.session["store_name"] = store.name
-
-#         return redirect("dashboard")
-
-#     return redirect("login")
-
-# from django.contrib.auth.decorators import login_required
-# from django.shortcuts import redirect
-# from django.contrib import messages
+        "stores": None
+    }) 
 
 
 @login_required
 def set_store(request):
-
     if request.method == "POST":
-
         store_id = request.POST.get("store_id")
-
+        
         print("Selected store:", store_id)
-
+        
         # only allow user's stores
         store = request.user.stores.filter(id=store_id).first()
-
+        
         if not store:
             messages.error(request, "Invalid store selected.")
             return redirect("dashboard")
-
+        
         # save session
         request.session["store_id"] = str(store.id)
         request.session["store_name"] = store.name
         request.session["store_type"] = store.store_type
-
+        
         print("Current store:", store.name)
-
-        messages.success(
-            request,
-            f"Switched to {store.name}"
-        )
-
+        
+        messages.success(request, f"Welcome to {store.name}!")
+        
+        # IMPORTANT: Redirect to dashboard after store selection
+        # return redirect("dashboard")
         return redirect(request.META.get("HTTP_REFERER", "dashboard"))
-
+        
+    
     return redirect("dashboard")
 
 
