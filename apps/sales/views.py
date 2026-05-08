@@ -1,27 +1,36 @@
-from django.shortcuts import render, get_object_or_404
-from django.utils import timezone
-from django.db.models import Sum, Count, F, Q
-from django.http import HttpResponse, HttpResponseForbidden
-from django.core.exceptions import PermissionDenied
+from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
+from django.db.models import Count, F, Q, Sum, Prefetch
+from django.http import HttpResponse, HttpResponseForbidden
+from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
 
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
-from .models import Sale, SaleItem
+from .models import Sale, SaleItem, Store
 from .serializers import (
+    SaleCreateSerializer,
+    SaleItemSerializer,
+    SaleListSerializer,
     SaleSerializer,
     SaleSummarySerializer,
-    SaleItemSerializer,
-    SaleCreateSerializer
 )
-from apps.inventory.models import Product, Category, Store
-from apps.inventory.serializers import ProductSerializer, CategorySerializer
-from apps.account.models import User
-from apps.account.context_processors import current_user
-from django.contrib.auth.decorators import login_required
 
+from apps.account.context_processors import current_user
+from apps.account.models import User
+from apps.inventory.models import Category, Product, Store
+from apps.inventory.serializers import CategorySerializer, ProductSerializer
+from apps.inventory.services import InventoryService
+from apps.inventory.store_utils import get_current_store
+
+
+User = get_user_model()
 # ---------------------------
 # Helper functions
 # ---------------------------
@@ -37,16 +46,6 @@ def get_current_user(request):
         return None
 
 
-# def login_required(view_func):
-#     """Decorator for session-based login"""
-#     def wrapper(request, *args, **kwargs):
-#         user = get_current_user(request)
-#         if not user:
-#             return HttpResponse('Please log in', status=401)
-#         request.user = user
-#         return view_func(request, *args, **kwargs)
-#     return wrapper
-
 
 def role_required(allowed_roles):
     """Decorator to restrict view by roles"""
@@ -61,53 +60,6 @@ def role_required(allowed_roles):
             return view_func(request, *args, **kwargs)
         return wrapper
     return decorator
-
-
-# ---------------------------
-# Template Views
-# ---------------------------
-
-# @login_required
-# def sales_dashboard(request):
-#     """Sales dashboard for the current user"""
-#     today = timezone.now().date()
-#     user = request.user
-
-#     today_sales = Sale.objects.filter(
-#         cashier=user,
-#         timestamp__date=today
-#     ).prefetch_related('items')
-
-#     today_total_sales = today_sales.count()
-#     today_revenue = today_sales.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
-#     today_items_sold = SaleItem.objects.filter(sale__in=today_sales).aggregate(
-#         Sum('quantity'))['quantity__sum'] or 0
-
-#     recent_sales = today_sales.order_by('-timestamp')[:5]
-
-#     shop = Store.objects.filter(store_type=Store.RETAIL).first()
-
-#     low_stock_products = Product.objects.filter(
-#         storestock__store=shop,
-#         storestock__quantity__lte=F('reorder_level'),
-#         is_active=True
-#     ).distinct()[:5]
-
-#     top_products_today = SaleItem.objects.filter(sale__in=today_sales).values(
-#         'product__name'
-#     ).annotate(total_sold=Sum('quantity')).order_by('-total_sold')[:5]
-
-#     context = {
-#         'today_total_sales': today_total_sales,
-#         'today_revenue': today_revenue,
-#         'today_items_sold': today_items_sold,
-#         'recent_sales': recent_sales,
-#         'low_stock_products': low_stock_products,
-#         'top_products_today': top_products_today,
-#         'user_role': getattr(user, 'role', None),
-#         'today': today,
-#     }
-#     return render(request, 'sales/pos_base.html', context)
 
 
 # @login_required
@@ -187,24 +139,6 @@ def pos_interface(request):
 
 
 
-# @login_required(login_url='/account/login/')
-# def my_sales(request):
-#     """
-#     Render the My Sales page.
-#     The actual sales data is fetched via AJAX from /sales/api/my-sales/
-#     """
-#     user = request.user
-#     user_role = getattr(user, 'role', 'user')  # Adjust based on your User model
-
-#     context = {
-#         'user_role': user_role,
-#     }
-#     return render(request, 'sales/my_sales.html', context)
-
-
-
-
-
 @login_required(login_url='/account/login/')
 def sale_detail(request, sale_id):
     """Detailed view of a sale"""
@@ -245,14 +179,6 @@ def sale_detail(request, sale_id):
 # API Views
 # ---------------------------
 
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
-from django.db.models import Prefetch, Count
-
-from .models import Sale, SaleItem, Store
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
 
 
 @login_required(login_url='/account/login/')
@@ -360,156 +286,30 @@ def sales_history(request):
 
     return render(request, 'sales/sales_history.html', context)
     
-# ---------------------------
-# SALE API VIEWS
-# ---------------------------
-# from rest_framework.permissions import IsAuthenticated
 
-# @api_view(['POST'])
-# @permission_classes([IsAuthenticated])
-# def api_create_sale(request):
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_all_sales(request):
+    sales = (
+        Sale.objects
+        .select_related("cashier", "store")
+        .prefetch_related("items__product")
+        .order_by("-timestamp")
+    )
 
-#     user = get_current_user(request)
+    serializer = SaleListSerializer(sales, many=True)
 
-#     # 🔹 Log incoming request & user info
-#     print("=== Incoming Sale Request ===")
-#     print("User:", user.id if user else None)
-#     print("Raw Request Data:", request.data)
-
-#     if not user:
-#         return Response({'error': 'Authentication required'}, status=401)
-
-#     data = request.data.copy()
-#     data['cashier'] = user.id
-
-#     # 🔹 Log data being passed to the serializer
-#     print("Data passed to serializer:", data)
-#     print("================================")
-
-#     serializer = SaleCreateSerializer(data=data)
-
-#     if serializer.is_valid():
-#         try:
-#             with transaction.atomic():
-#                 sale = serializer.save()
-
-#             # 🔹 Log successfully created sale
-#             print("Sale Created:", SaleSerializer(sale).data)
-
-#             return Response(SaleSerializer(sale).data, status=201)
-
-#         except Exception as e:
-#             print("Error during transaction:", e)  # Debug logging
-#             return Response({'error': str(e)}, status=400)
-
-#     else:
-#         # 🔹 Log serializer validation errors
-#         print("Serializer Errors:", serializer.errors)
-#         return Response(serializer.errors, status=400)
+    return Response(
+        {
+            "success": True,
+            "count": sales.count(),
+            "data": serializer.data,
+        },
+        status=status.HTTP_200_OK,
+    )
 
 
 
-# from rest_framework.decorators import api_view, permission_classes
-# from rest_framework.permissions import IsAuthenticated
-# from rest_framework.response import Response
-
-# @api_view(['POST'])
-# @permission_classes([IsAuthenticated])
-# def api_create_sale(request):
-#     user = request.user  # guaranteed to be authenticated
-#     print("=== Incoming Sale Request ===")
-#     print("User:", user.id)
-#     print("Raw Request Data:", request.data)
-
-#     data = request.data.copy()
-#     data['cashier'] = user.id
-
-#     serializer = SaleCreateSerializer(data=data)
-
-#     if serializer.is_valid():
-#         sale = serializer.save()
-#         print("Sale Created:", SaleSerializer(sale).data)
-#         return Response(SaleSerializer(sale).data, status=201)
-#     else:
-#         print("Serializer Errors:", serializer.errors)
-#         return Response(serializer.errors, status=400)
-
-
-from apps.inventory.store_utils import get_current_store  # Import your helper
-
-
-
-from django.db import transaction
-from django.core.exceptions import ValidationError
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status
-
-
-from apps.inventory.services import InventoryService
-
-# @api_view(['POST'])
-# @permission_classes([IsAuthenticated])
-# def api_create_sale(request):
-#     user = request.user
-#     print('the data is', request.data)
-    
-#     try:
-#         store = get_current_store(request)
-#     except Exception as e:
-#         return Response(
-#             {"error": str(e)},
-#             status=status.HTTP_403_FORBIDDEN
-#         )
-
-#     if not store:
-#         return Response(
-#             {"error": "No store selected"},
-#             status=status.HTTP_400_BAD_REQUEST
-#         )
-
-#     data = request.data.copy()
-#     data['cashier'] = user.id
-
-#     serializer = SaleCreateSerializer(
-#         data=data,
-#         context={'store': store, 'user': user}
-#     )
-
-#     if not serializer.is_valid():
-#         print("Serializer errors:", serializer.errors)  # Add this to see the error
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-#     try:
-#         with transaction.atomic():
-#             # The serializer's create method will handle creating the sale and items
-#             sale = serializer.save()  # Don't create sale again here!
-            
-#             # Now handle stock removal
-#             for item in serializer.validated_data['items']:
-#                 product = Product.objects.get(id=item['product_id'])
-#                 quantity = item['quantity']
-                
-#                 InventoryService.remove_stock(
-#                     product=product,
-#                     store=store,
-#                     quantity=quantity,
-#                     user=user,
-#                     reference=f"SALE_{sale.sale_id}",
-#                     remarks=f"Sale: {quantity} units"
-#                 )
-
-#         return Response({"success": True, "sale_id": str(sale.sale_id)}, status=status.HTTP_201_CREATED)
-
-#     except ValidationError as e:
-#         return Response({"error": e.messages}, status=status.HTTP_400_BAD_REQUEST)
-#     except Exception as e:
-#         print("Error:", str(e))  # Print the actual error
-#         return Response(
-#             {"error": f"Failed to create sale: {str(e)}"},
-#             status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#         )
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

@@ -168,3 +168,34 @@ class SaleSummarySerializer(serializers.ModelSerializer):
             'sale_id', 'cashier_name', 'total_amount', 
             'timestamp', 'items_count'
         ]
+
+
+class SaleListSerializer(serializers.ModelSerializer):
+    cashier_name = serializers.SerializerMethodField()
+    items = SaleItemSerializer(many=True, read_only=True)
+    subtotal = serializers.SerializerMethodField()
+    tax_amount = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Sale
+        fields = [
+            "sale_id",
+            "cashier_name",
+            "total_amount",
+            "subtotal",
+            "tax_amount",
+            "timestamp",
+            "store",
+            "items",
+        ]
+
+    def get_cashier_name(self, obj):
+        if obj.cashier:
+            return obj.cashier.get_full_name() or obj.cashier.username
+        return None
+
+    def get_subtotal(self, obj):
+        return obj.get_subtotal()
+
+    def get_tax_amount(self, obj):
+        return obj.get_tax_amount()
