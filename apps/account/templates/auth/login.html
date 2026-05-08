@@ -190,7 +190,7 @@
                 <!-- Animated Text -->
                 <div class="text-center space-y-4">
                     <h3 class="text-3xl font-bold animate-slideInRight">
-                        Your Store Management
+                        Vision Store Management
                     </h3>
                     <p class="text-lg text-blue-100 animate-slideInRight animation-delay-200">
                         Streamline your business operations
@@ -239,6 +239,84 @@
     </div>
 </div>
 
+<!-- Store Selection Modal -->
+{% if stores %}
+<div id="storeModal" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <!-- Background overlay with animation -->
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity backdrop-blur-sm animate-fadeIn" aria-hidden="true"></div>
+
+        <!-- Modal panel with animation -->
+        <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full animate-slideInUp">
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white" id="modal-title">
+                        Select Store
+                    </h3>
+                </div>
+            </div>
+            
+            <div class="bg-white px-6 py-6">
+                <div class="mb-4">
+                    <p class="text-gray-700 text-sm">
+                        Welcome! You have access to multiple stores. Please select which store you want to work with:
+                    </p>
+                </div>
+                
+                <form id="storeSelectForm" action="{% url 'set_store' %}" method="POST" class="space-y-4">
+                    {% csrf_token %}
+                    
+                    <div class="space-y-3">
+                        {% for store in stores %}
+                        <label class="relative flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-105 {% if forloop.first %}border-blue-500 bg-blue-50{% else %}border-gray-200 hover:border-blue-300{% endif %}">
+                            <input type="radio" 
+                                   name="store_id" 
+                                   value="{{ store.id }}"
+                                   class="w-5 h-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-full"
+                                   {% if forloop.first %}checked{% endif %}>
+                            <div class="ml-4 flex-1">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-lg font-semibold text-gray-900">{{ store.name }}</span>
+                                    {% if forloop.first %}
+                                    <span class="px-2 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-full">Recommended</span>
+                                    {% endif %}
+                                </div>
+                                {% if store.address %}
+                                <p class="text-sm text-gray-500 mt-1">{{ store.address }}</p>
+                                {% endif %}
+                                {% if store.phone %}
+                                <p class="text-xs text-gray-400 mt-1">📞 {{ store.phone }}</p>
+                                {% endif %}
+                            </div>
+                            <div class="absolute inset-0 rounded-xl pointer-events-none transition-all duration-300 store-card-border"></div>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="mt-6 flex space-x-3">
+                        <button type="submit" 
+                                id="confirmStoreBtn"
+                                class="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            Continue to Dashboard
+                        </button>
+                        <button type="button" 
+                                id="logoutBtn"
+                                class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 px-4 rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                            Sign Out
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- JavaScript for Interactions -->
 <script>
 // Password visibility toggle
@@ -258,14 +336,16 @@ document.querySelectorAll('.toggle-password').forEach(button => {
 });
 
 // Form submission loading state
-document.getElementById('loginForm').addEventListener('submit', function(e) {
+document.getElementById('loginForm')?.addEventListener('submit', function(e) {
     const button = document.getElementById('loginButton');
     const buttonText = document.getElementById('buttonText');
     const buttonSpinner = document.getElementById('buttonSpinner');
     
-    buttonText.classList.add('hidden');
-    buttonSpinner.classList.remove('hidden');
-    button.disabled = true;
+    if (button && buttonText && buttonSpinner) {
+        buttonText.classList.add('hidden');
+        buttonSpinner.classList.remove('hidden');
+        button.disabled = true;
+    }
 });
 
 // Auto-focus on unique_id field
@@ -273,6 +353,57 @@ document.addEventListener('DOMContentLoaded', function() {
     const uniqueIdField = document.getElementById('{{ form.unique_id.id_for_label }}');
     if (uniqueIdField) {
         setTimeout(() => uniqueIdField.focus(), 100);
+    }
+    
+    // Handle modal interactions
+    const storeModal = document.getElementById('storeModal');
+    if (storeModal) {
+        // Prevent body scrolling when modal is open
+        document.body.style.overflow = 'hidden';
+        
+        // Handle sign out button
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', function() {
+                window.location.href = '{% url "logout" %}';
+            });
+        }
+        
+        // Animate radio selection
+        const radioLabels = document.querySelectorAll('label');
+        radioLabels.forEach(label => {
+            label.addEventListener('click', function(e) {
+                // Don't trigger if clicking on the radio input directly (it will handle itself)
+                if (e.target.type !== 'radio') {
+                    const radio = this.querySelector('input[type="radio"]');
+                    if (radio) radio.checked = true;
+                }
+                
+                // Update visual selection
+                radioLabels.forEach(l => {
+                    l.classList.remove('border-blue-500', 'bg-blue-50');
+                    l.classList.add('border-gray-200');
+                });
+                this.classList.remove('border-gray-200');
+                this.classList.add('border-blue-500', 'bg-blue-50');
+            });
+        });
+        
+        // Handle form submission with loading state
+        const storeForm = document.getElementById('storeSelectForm');
+        const confirmBtn = document.getElementById('confirmStoreBtn');
+        
+        if (storeForm && confirmBtn) {
+            storeForm.addEventListener('submit', function() {
+                confirmBtn.disabled = true;
+                confirmBtn.innerHTML = `
+                    <svg class="animate-spin h-5 w-5 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                `;
+            });
+        }
     }
 });
 
@@ -305,6 +436,17 @@ inputs.forEach(input => {
     from {
         opacity: 0;
         transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
     }
     to {
         opacity: 1;
@@ -351,6 +493,10 @@ inputs.forEach(input => {
 
 .animate-fadeInUp {
     animation: fadeInUp 0.6s ease-out;
+}
+
+.animate-slideInUp {
+    animation: slideInUp 0.5s ease-out;
 }
 
 .animate-fadeIn {
@@ -410,6 +556,16 @@ inputs.forEach(input => {
     transition: all 0.3s ease;
 }
 
+/* Store card hover effect */
+.store-card-border {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+    transition: box-shadow 0.3s ease;
+}
+
+label:hover .store-card-border {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
 /* Smooth scrolling */
 html {
     scroll-behavior: smooth;
@@ -426,5 +582,18 @@ input:focus {
 .backdrop-blur-sm {
     backdrop-filter: blur(8px);
 }
+
+/* Modal scroll prevention */
+body.modal-open {
+    overflow: hidden;
+}
 </style>
+
+<!-- Additional script to ensure modal doesn't cause scroll issues -->
+<script>
+// Add modal-open class to body when modal is present
+if (document.getElementById('storeModal')) {
+    document.body.classList.add('modal-open');
+}
+</script>
 {% endblock %}

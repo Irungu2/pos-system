@@ -40,7 +40,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     )
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
+    stores = models.ManyToManyField("inventory.Store", blank=True)
     # 🔐 unique_id is still unique at DB level
     unique_id = models.CharField(
         max_length=4,
@@ -62,6 +62,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = []
 
     def __str__(self):
+        return self.get_full_name()
+
+    @property
+    def display_name(self):
         return self.get_full_name()
 
     def get_full_name(self):

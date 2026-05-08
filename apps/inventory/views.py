@@ -124,123 +124,624 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class ProductViewSet2(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
-    queryset = Product.objects.all().select_related('category')
-    serializer_class = ProductSerializer
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['category', 'is_active']
-    search_fields = ['name', 'sku', 'barcode', 'description']
-    ordering_fields = ['name', 'selling_price', 'created_at']
-    ordering = ['name']
+# @method_decorator(csrf_exempt, name='dispatch')
+# class ProductViewSet2(viewsets.ModelViewSet):
+#     permission_classes = [IsAuthenticated]
+#     queryset = Product.objects.all().select_related('category')
+#     serializer_class = ProductSerializer
+#     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+#     filterset_fields = ['category', 'is_active']
+#     search_fields = ['name', 'sku', 'barcode', 'description']
+#     ordering_fields = ['name', 'selling_price', 'created_at']
+#     ordering = ['name']
 
-    def get_queryset(self):
-        print("\n[POS API] get_queryset called")
-        queryset = super().get_queryset()
-        stock_status = self.request.query_params.get('stock_status')
-        if stock_status:
-            if stock_status == 'out_of_stock':
-                queryset = queryset.filter(available_stock=0)
-            elif stock_status == 'low_stock':
-                queryset = queryset.filter(available_stock__lte=F('reorder_level'), available_stock__gt=0)
-            elif stock_status == 'in_stock':
-                queryset = queryset.filter(available_stock__gt=F('reorder_level'))
-        print("[POS API] queryset count after stock filter:", queryset.count())
-        return queryset
+#     def get_queryset(self):
+#         print("\n[POS API] get_queryset called")
+#         queryset = super().get_queryset()
+#         stock_status = self.request.query_params.get('stock_status')
+#         if stock_status:
+#             if stock_status == 'out_of_stock':
+#                 queryset = queryset.filter(available_stock=0)
+#             elif stock_status == 'low_stock':
+#                 queryset = queryset.filter(available_stock__lte=F('reorder_level'), available_stock__gt=0)
+#             elif stock_status == 'in_stock':
+#                 queryset = queryset.filter(available_stock__gt=F('reorder_level'))
+#         print("[POS API] queryset count after stock filter:", queryset.count())
+#         return queryset
 
-    @action(detail=False, methods=['get'])
-    def low_stock(self, request):
-        print("\n[POS API] low_stock called")
-        low_stock_products = self.get_queryset().filter(
-            available_stock__lte=F('reorder_level'),
-            is_active=True
-        )
-        print("[POS API] Low stock count:", low_stock_products.count())
-        serializer = self.get_serializer(low_stock_products, many=True)
-        return Response(serializer.data)
+#     @action(detail=False, methods=['get'])
+#     def low_stock(self, request):
+#         print("\n[POS API] low_stock called")
+#         low_stock_products = self.get_queryset().filter(
+#             available_stock__lte=F('reorder_level'),
+#             is_active=True
+#         )
+#         print("[POS API] Low stock count:", low_stock_products.count())
+#         serializer = self.get_serializer(low_stock_products, many=True)
+#         return Response(serializer.data)
 
-    @action(detail=False, methods=['get'])
-    def search_products(self, request):
-        print("\n[POS API] search_products called")
-        search_term = request.GET.get('q', '')
-        category_id = request.GET.get('category')
-        print("[POS API] Search term:", search_term)
-        print("[POS API] Category filter:", category_id)
+#     @action(detail=False, methods=['get'])
+#     def search_products(self, request):
+#         print("\n[POS API] search_products called")
+#         search_term = request.GET.get('q', '')
+#         category_id = request.GET.get('category')
+#         print("[POS API] Search term:", search_term)
+#         print("[POS API] Category filter:", category_id)
 
-        retail_store = Store.objects.filter(store_type=Store.RETAIL).first()
-        if not retail_store:
-            print("[POS API] ERROR: No retail store found")
-            return Response([], status=200)
+#         retail_store = Store.objects.filter(store_type=Store.RETAIL).first()
+#         if not retail_store:
+#             print("[POS API] ERROR: No retail store found")
+#             return Response([], status=200)
 
-        queryset = Product.objects.filter(
-            is_active=True,
-            storestock__store=retail_store,
-            storestock__quantity__gt=0
-        ).select_related('category').annotate(
-            available_quantity=F('storestock__quantity')
-        )
+#         queryset = Product.objects.filter(
+#             is_active=True,
+#             storestock__store=retail_store,
+#             storestock__quantity__gt=0
+#         ).select_related('category').annotate(
+#             available_quantity=F('storestock__quantity')
+#         )
 
-        if search_term:
-            queryset = queryset.filter(
-                Q(name__icontains=search_term) |
-                Q(sku__icontains=search_term) |
-                Q(barcode__icontains=search_term)
-            )
+#         if search_term:
+#             queryset = queryset.filter(
+#                 Q(name__icontains=search_term) |
+#                 Q(sku__icontains=search_term) |
+#                 Q(barcode__icontains=search_term)
+#             )
 
-        if category_id:
-            queryset = queryset.filter(category_id=category_id)
+#         if category_id:
+#             queryset = queryset.filter(category_id=category_id)
 
-        print("[POS API] Final queryset count:", queryset.count())
+#         print("[POS API] Final queryset count:", queryset.count())
 
-        queryset = queryset[:50]
-        serializer = POSProductSerializer(queryset, many=True)
-        print("[POS API] Serialized count:", len(serializer.data))
-        return Response(serializer.data)
+#         queryset = queryset[:50]
+#         serializer = POSProductSerializer(queryset, many=True)
+#         print("[POS API] Serialized count:", len(serializer.data))
+#         return Response(serializer.data)
 
-    @action(detail=True, methods=['post'])
-    def update_store_stock(self, request, pk=None):
-        print("\n[POS API] update_store_stock called")
-        product = self.get_object()
-        store_id = request.data.get('store_id')
-        quantity = request.data.get('quantity')
-        action_type = request.data.get('action')
+#     @action(detail=True, methods=['post'])
+#     def update_store_stock(self, request, pk=None):
+#         print("\n[POS API] update_store_stock called")
+#         product = self.get_object()
+#         store_id = request.data.get('store_id')
+#         quantity = request.data.get('quantity')
+#         action_type = request.data.get('action')
 
-        print("[POS API] store_id:", store_id, "quantity:", quantity, "action:", action_type)
+#         print("[POS API] store_id:", store_id, "quantity:", quantity, "action:", action_type)
 
-        if not store_id or not isinstance(quantity, int):
-            return Response({'error': 'Store ID and valid quantity are required'}, status=400)
+#         if not store_id or not isinstance(quantity, int):
+#             return Response({'error': 'Store ID and valid quantity are required'}, status=400)
 
-        try:
-            store = Store.objects.get(id=store_id)
-            store_stock, _ = StoreStock.objects.get_or_create(store=store, product=product, defaults={'quantity': 0})
+#         try:
+#             store = Store.objects.get(id=store_id)
+#             store_stock, _ = StoreStock.objects.get_or_create(store=store, product=product, defaults={'quantity': 0})
 
-            if action_type == 'add':
-                store_stock.quantity += quantity
-            elif action_type == 'set':
-                store_stock.quantity = quantity
-            else:
-                return Response({'error': 'Action must be "add" or "set"'}, status=400)
+#             if action_type == 'add':
+#                 store_stock.quantity += quantity
+#             elif action_type == 'set':
+#                 store_stock.quantity = quantity
+#             else:
+#                 return Response({'error': 'Action must be "add" or "set"'}, status=400)
 
-            store_stock.save()
-            StockTransaction.objects.create(
-                product=product,
-                store=store,
-                transaction_type=StockTransaction.IN if quantity > 0 else StockTransaction.OUT,
-                quantity=abs(quantity),
-                performed_by=request.user,
-                remarks=f"Manual stock adjustment: {action_type}"
-            )
-            print("[POS API] Stock updated:", store_stock.quantity)
-            serializer = self.get_serializer(product)
-            return Response(serializer.data)
+#             store_stock.save()
+#             StockTransaction.objects.create(
+#                 product=product,
+#                 store=store,
+#                 transaction_type=StockTransaction.IN if quantity > 0 else StockTransaction.OUT,
+#                 quantity=abs(quantity),
+#                 performed_by=request.user,
+#                 remarks=f"Manual stock adjustment: {action_type}"
+#             )
+#             print("[POS API] Stock updated:", store_stock.quantity)
+#             serializer = self.get_serializer(product)
+#             return Response(serializer.data)
 
-        except Store.DoesNotExist:
-            return Response({'error': 'Store not found'}, status=404)
-        except Exception as e:
-            print("[POS API] EXCEPTION:", str(e))
-            return Response({'error': str(e)}, status=400)
+#         except Store.DoesNotExist:
+#             return Response({'error': 'Store not found'}, status=404)
+#         except Exception as e:
+#             print("[POS API] EXCEPTION:", str(e))
+#             return Response({'error': str(e)}, status=400)
 
+
+# @method_decorator(csrf_exempt, name='dispatch')
+# class ProductViewSet(viewsets.ModelViewSet):
+#     queryset = Product.objects.all().select_related("category")
+#     serializer_class = ProductSerializer
+
+#     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+#     filterset_fields = ["category", "is_active"]
+#     search_fields = ["name", "sku", "barcode", "description"]
+#     ordering_fields = ["name", "selling_price", "created_at"]
+#     ordering = ["name"]
+
+
+#     def get_queryset(self):
+#         user = self.request.user
+
+#         qs = Product.objects.all().select_related("category")
+
+#         # 👑 ADMIN / MANAGER → see everything
+#         if user.is_superuser or user.role in ["admin", "manager"]:
+#             return qs.distinct()
+
+#         # 👤 NORMAL USER → only retail with stock
+#         return qs.filter(
+#             storestock__store__store_type=Store.RETAIL,
+#             storestock__quantity__gt=0
+#         ).distinct()
+
+
+#     @action(detail=False, methods=["get"], url_path="low_stock")
+#     # def low_stock(self, request):
+#     #     print("\n[PRODUCT API] low_stock called")
+#     #     low_stock_items = self.queryset.filter(stock__lt=10)
+#     #     print("[PRODUCT API] Low stock count:", low_stock_items.count())
+#     #     serializer = self.get_serializer(low_stock_items, many=True)
+#     #     return Response(serializer.data)
+#     def low_stock(self, request):
+#         store = get_store(request)
+
+#         qs = Product.objects.filter(
+#             storestock__store=store,
+#             storestock__quantity__lte=F("reorder_level")
+#         ).distinct()
+
+#         serializer = self.get_serializer(qs, many=True)
+#         return Response(serializer.data)
+
+
+#     @action(detail=False, methods=["get"], url_path="search_products")
+#     def search_products(self, request):
+#         print("\n[PRODUCT API] search_products called")
+#         query = request.query_params.get("q", "")
+#         category = request.query_params.get("category")
+#         print("[PRODUCT API] Search query:", query)
+#         print("[PRODUCT API] Category filter:", category)
+
+#         qs = self.queryset
+
+#         # Filter by query if provided
+#         if query:
+#             qs = qs.filter(
+#                 name__icontains=query
+#             )
+
+#         # Filter by category if provided
+#         if category:
+#             qs = qs.filter(category_id=category)
+
+#         print("[PRODUCT API] Result count:", qs.count())
+
+#         serializer = self.get_serializer(qs[:50], many=True)
+#         print("[PRODUCT API] Serialized count:", len(serializer.data))
+#         return Response(serializer.data)
+
+
+#     @action(detail=True, methods=["post"], url_path="update_store_stock")
+#     def update_store_stock(self, request, pk=None):
+#         product = self.get_object()
+
+#         store_id = request.data.get("store_id")
+#         action = request.data.get("action", "set")
+
+#         try:
+#             quantity = int(request.data.get("quantity"))
+#         except (TypeError, ValueError):
+#             return Response({"error": "Invalid quantity"}, status=400)
+
+#         if not store_id:
+#             return Response({"error": "store_id is required"}, status=400)
+
+#         # get or create stock row
+#         store_stock, _ = StoreStock.objects.get_or_create(
+#             product=product,
+#             store_id=store_id,
+#             defaults={"quantity": 0}
+#         )
+
+#         if action == "set":
+#             store_stock.quantity = quantity
+#             store_stock.save()
+
+#         elif action == "add":
+#             StoreStock.objects.filter(id=store_stock.id).update(
+#                 quantity=F("quantity") + quantity
+#             )
+
+#         elif action == "remove":
+#             with transaction.atomic():
+#                 stock = StoreStock.objects.select_for_update().get(id=store_stock.id)
+
+#                 if stock.quantity < quantity:
+#                     return Response({"error": "Insufficient stock"}, status=400)
+
+#                 stock.quantity -= quantity
+#                 stock.save()
+
+#         else:
+#             return Response({"error": "Invalid action"}, status=400)
+
+#         store_stock.refresh_from_db()
+
+#         return Response({
+#             "message": "Stock updated successfully",
+#             "store_id": store_id,
+#             "product_id": product.id,
+#             "quantity": store_stock.quantity
+#         })
+
+#     @action(detail=True, methods=["post"], url_path="toggle_active")
+#     def toggle_active(self, request, pk=None):
+#         print("\n[PRODUCT API] toggle_active called")
+#         product = self.get_object()
+#         old_status = product.is_active
+#         product.is_active = not old_status
+#         product.save()
+#         print("[PRODUCT API] is_active:", old_status, "→", product.is_active)
+#         return Response({"is_active": product.is_active})
+
+#     @action(detail=True, methods=["post"], url_path="restock")
+#     def restock(self, request, pk=None):
+#         print("\n[PRODUCT API] restock called")
+#         product = self.get_object()
+#         try:
+#             qty = int(request.data.get("qty", 0))
+#         except ValueError:
+#             return Response({"error": "Invalid quantity"}, status=400)
+
+#         if qty <= 0:
+#             return Response({"error": "Invalid quantity"}, status=400)
+
+#         old_stock = product.stock
+#         product.stock += qty
+#         product.save()
+#         print("[PRODUCT API] Stock updated:", old_stock, "→", product.stock)
+
+#         return Response({"message": "Product restocked", "stock": product.stock})
+
+
+# from django.core.exceptions import PermissionDenied
+# from django.db.models import F
+# from django.db import transaction
+# from django.utils.decorators import method_decorator
+# from django.views.decorators.csrf import csrf_exempt
+# from rest_framework import viewsets, filters
+# from rest_framework.decorators import action
+# from rest_framework.response import Response
+# from django_filters.rest_framework import DjangoFilterBackend
+# from .models import Product, StoreStock
+# from .serializers import ProductSerializer
+# from apps.inventory.models import Store
+# from .store_utils import get_current_store  # Import your helper
+
+# @method_decorator(csrf_exempt, name='dispatch')
+# class ProductViewSet(viewsets.ModelViewSet):
+#     queryset = Product.objects.all().select_related("category")
+#     serializer_class = ProductSerializer
+
+#     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+#     filterset_fields = ["category", "is_active"]
+#     search_fields = ["name", "sku", "barcode", "description"]
+#     ordering_fields = ["name", "selling_price", "created_at"]
+#     ordering = ["name"]
+
+#     def get_queryset(self):
+#         user = self.request.user
+
+#         qs = Product.objects.all().select_related("category")
+
+#         # 👑 ADMIN / MANAGER → see everything
+#         if user.is_superuser or user.role in ["admin", "manager"]:
+#             return qs.distinct()
+
+#         # 👤 NORMAL USER → only products in their store with stock
+#         try:
+#             store = get_current_store(self.request)
+#             if store:
+#                 return qs.filter(
+#                     storestock__store=store,
+#                     storestock__quantity__gt=0
+#                 ).distinct()
+#         except PermissionDenied:
+#             pass
+        
+#         # If no store selected or permission denied, return empty
+#         return qs.none()
+
+#     @action(detail=False, methods=["get"], url_path="low_stock")
+#     def low_stock(self, request):
+#         try:
+#             store = get_current_store(request)
+#             if not store:
+#                 return Response({"error": "No store selected"}, status=400)
+            
+#             qs = Product.objects.filter(
+#                 storestock__store=store,
+#                 storestock__quantity__lte=F("reorder_level")
+#             ).distinct()
+
+#             serializer = self.get_serializer(qs, many=True)
+#             return Response(serializer.data)
+            
+#         except PermissionDenied as e:
+#             return Response({"error": str(e)}, status=403)
+
+#     # @action(detail=False, methods=["get"], url_path="search_products")
+#     # def search_products(self, request):
+#     #     print("\n[PRODUCT API] search_products called")
+#     #     query = request.query_params.get("q", "")
+#     #     category = request.query_params.get("category")
+#     #     print("[PRODUCT API] Search query:", query)
+#     #     print("[PRODUCT API] Category filter:", category)
+
+#     #     # Get the base queryset based on user role
+#     #     user = request.user
+#     #     qs = Product.objects.all().select_related("category")
+        
+#     #     # Apply store filter for non-admin users
+#     #     if not (user.is_superuser or user.role in ["admin", "manager"]):
+#     #         try:
+#     #             store = get_current_store(request)
+#     #             if store:
+#     #                 qs = qs.filter(storestock__store=store).distinct()
+#     #             else:
+#     #                 return Response({"error": "No store selected"}, status=400)
+#     #         except PermissionDenied as e:
+#     #             return Response({"error": str(e)}, status=403)
+
+#     #     # Filter by query if provided
+#     #     if query:
+#     #         qs = qs.filter(name__icontains=query)
+
+#     #     # Filter by category if provided
+#     #     if category:
+#     #         qs = qs.filter(category_id=category)
+
+#     #     print("[PRODUCT API] Result count:", qs.count())
+
+#     #     serializer = self.get_serializer(qs[:50], many=True)
+#     #     print("[PRODUCT API] Serialized count:", len(serializer.data))
+#     #     return Response(serializer.data)
+
+
+#     @action(detail=False, methods=["get"], url_path="search_products")
+#     def search_products(self, request):
+#         print("\n" + "="*50)
+#         print("[PRODUCT API] search_products called")
+#         print("="*50)
+        
+#         query = request.query_params.get("q", "")
+#         category = request.query_params.get("category")
+#         print(f"[PRODUCT API] Search query: '{query}'")
+#         print(f"[PRODUCT API] Category filter: '{category}'")
+#         print(f"[PRODUCT API] User: {request.user.display_name} (Role: {request.user.role})")
+        
+#         # Get the base queryset based on user role
+#         user = request.user
+#         qs = Product.objects.all().select_related("category")
+        
+#         print(f"\n[STEP 1] Initial queryset count: {qs.count()}")
+        
+#         # Apply store filter for non-admin users
+#         if not (user.is_superuser or user.role in ["admin", "manager"]):
+#             print(f"\n[STEP 2] User is NOT admin - applying store filter")
+#             try:
+#                 store = get_current_store(request)
+#                 if store:
+#                     print(f"[STEP 2a] Current store: {store.name} (ID: {store.id})")
+#                     print(f"[STEP 2b] Filtering products by store_id={store.id}")
+                    
+#                     # Show the filter being applied
+#                     qs = qs.filter(storestock__store=store).distinct()
+                    
+#                     # Print the SQL query
+#                     print(f"\n[SQL QUERY] {str(qs.query)}")
+#                     print(f"\n[STEP 2c] After store filter count: {qs.count()}")
+                    
+#                     # Print first 5 products after store filter
+#                     print(f"\n[PRODUCTS IN STORE {store.name}]:")
+#                     for idx, p in enumerate(qs[:5], 1):
+#                         stock = StoreStock.objects.filter(store=store, product=p).first()
+#                         print(f"  {idx}. {p.name} (ID: {p.id}) - Stock in store: {stock.quantity if stock else 0}")
+#                 else:
+#                     print(f"[STEP 2a] No store selected! Returning error")
+#                     return Response({"error": "No store selected"}, status=400)
+#             except PermissionDenied as e:
+#                 print(f"[STEP 2 ERROR] Permission denied: {str(e)}")
+#                 return Response({"error": str(e)}, status=403)
+#         else:
+#             print(f"\n[STEP 2] User IS admin/superuser - NO store filter applied")
+#             print(f"[STEP 2a] Admin can see all products from all stores")
+#             print(f"[SQL QUERY] {str(qs.query)}")
+        
+#         # Filter by query if provided
+#         if query:
+#             print(f"\n[STEP 3] Applying search filter for: '{query}'")
+#             old_count = qs.count()
+#             qs = qs.filter(name__icontains=query)
+#             print(f"[STEP 3a] Products found with name containing '{query}': {qs.count()} (was {old_count})")
+            
+#             # Print matching products
+#             for idx, p in enumerate(qs[:5], 1):
+#                 print(f"  {idx}. {p.name} - Matches search")
+#         else:
+#             print(f"\n[STEP 3] No search query provided - skipping name filter")
+        
+#         # Filter by category if provided
+#         if category:
+#             print(f"\n[STEP 4] Applying category filter for ID: '{category}'")
+#             old_count = qs.count()
+#             qs = qs.filter(category_id=category)
+#             print(f"[STEP 4a] Products in category {category}: {qs.count()} (was {old_count})")
+            
+#             # Print matching products
+#             for idx, p in enumerate(qs[:5], 1):
+#                 print(f"  {idx}. {p.name} - Category ID: {p.category_id}")
+#         else:
+#             print(f"\n[STEP 4] No category filter provided - skipping category filter")
+        
+#         # Final results
+#         print(f"\n[STEP 5] FINAL RESULTS")
+#         print(f"[STEP 5a] Total products after all filters: {qs.count()}")
+        
+#         # Get the final queryset (limit to 50)
+#         final_qs = qs[:50]
+#         print(f"[STEP 5b] Returning first {len(final_qs)} products (limited to 50)")
+        
+#         # Print detailed results
+#         print(f"\n[FINAL PRODUCTS LIST]:")
+#         for idx, product in enumerate(final_qs, 1):
+#             # Get stock for current store
+#             try:
+#                 store = get_current_store(request)
+#                 if store and not (user.is_superuser or user.role in ["admin", "manager"]):
+#                     stock_item = StoreStock.objects.filter(store=store, product=product).first()
+#                     stock_qty = stock_item.quantity if stock_item else 0
+#                 else:
+#                     # For admin, show stock from any store
+#                     stock_qty = "All stores"
+#             except:
+#                 stock_qty = "Unknown"
+            
+#             print(f"  {idx}. ID:{product.id} | Name:{product.name} | Price:{product.selling_price} | Stock:{stock_qty}")
+        
+#         # Serialize and return
+#         serializer = self.get_serializer(final_qs, many=True)
+#         print(f"\n[STEP 6] Serialized {len(serializer.data)} products to JSON")
+#         print("="*50 + "\n")
+        
+#         return Response(serializer.data)
+
+
+#     @action(detail=True, methods=["post"], url_path="update_store_stock")
+#     def update_store_stock(self, request, pk=None):
+#         product = self.get_object()
+        
+#         # Get store from request or session
+#         store_id = request.data.get("store_id")
+        
+#         if not store_id:
+#             # Try to get from session if not provided
+#             try:
+#                 store = get_current_store(request)
+#                 if store:
+#                     store_id = store.id
+#                 else:
+#                     return Response({"error": "store_id is required or select a store"}, status=400)
+#             except PermissionDenied as e:
+#                 return Response({"error": str(e)}, status=403)
+
+#         action_type = request.data.get("action", "set")
+
+#         try:
+#             quantity = int(request.data.get("quantity"))
+#         except (TypeError, ValueError):
+#             return Response({"error": "Invalid quantity"}, status=400)
+
+#         # get or create stock row
+#         store_stock, created = StoreStock.objects.get_or_create(
+#             product=product,
+#             store_id=store_id,
+#             defaults={"quantity": 0}
+#         )
+
+#         if action_type == "set":
+#             store_stock.quantity = quantity
+#             store_stock.save()
+
+#         elif action_type == "add":
+#             StoreStock.objects.filter(id=store_stock.id).update(
+#                 quantity=F("quantity") + quantity
+#             )
+
+#         elif action_type == "remove":
+#             with transaction.atomic():
+#                 stock = StoreStock.objects.select_for_update().get(id=store_stock.id)
+
+#                 if stock.quantity < quantity:
+#                     return Response({"error": "Insufficient stock"}, status=400)
+
+#                 stock.quantity -= quantity
+#                 stock.save()
+
+#         else:
+#             return Response({"error": "Invalid action. Use 'set', 'add', or 'remove'"}, status=400)
+
+#         store_stock.refresh_from_db()
+
+#         return Response({
+#             "message": "Stock updated successfully",
+#             "store_id": store_id,
+#             "product_id": product.id,
+#             "quantity": store_stock.quantity
+#         })
+
+#     @action(detail=True, methods=["post"], url_path="toggle_active")
+#     def toggle_active(self, request, pk=None):
+#         print("\n[PRODUCT API] toggle_active called")
+#         product = self.get_object()
+#         old_status = product.is_active
+#         product.is_active = not old_status
+#         product.save()
+#         print("[PRODUCT API] is_active:", old_status, "→", product.is_active)
+#         return Response({"is_active": product.is_active})
+
+#     @action(detail=True, methods=["post"], url_path="restock")
+#     def restock(self, request, pk=None):
+#         print("\n[PRODUCT API] restock called")
+#         product = self.get_object()
+        
+#         try:
+#             qty = int(request.data.get("qty", 0))
+#         except ValueError:
+#             return Response({"error": "Invalid quantity"}, status=400)
+
+#         if qty <= 0:
+#             return Response({"error": "Quantity must be greater than 0"}, status=400)
+
+#         # Get the store
+#         try:
+#             store = get_current_store(request)
+#             if not store:
+#                 return Response({"error": "No store selected"}, status=400)
+#         except PermissionDenied as e:
+#             return Response({"error": str(e)}, status=403)
+        
+#         # Update store stock, not global product stock
+#         store_stock, created = StoreStock.objects.get_or_create(
+#             product=product,
+#             store=store,
+#             defaults={"quantity": 0}
+#         )
+        
+#         old_stock = store_stock.quantity
+#         store_stock.quantity += qty
+#         store_stock.save()
+        
+#         print("[PRODUCT API] Stock updated:", old_stock, "→", store_stock.quantity)
+
+#         return Response({
+#             "message": "Product restocked successfully",
+#             "store_id": store.id,
+#             "product_id": product.id,
+#             "old_quantity": old_stock,
+#             "new_quantity": store_stock.quantity
+#         })
+
+
+
+from django.core.exceptions import PermissionDenied
+from django.db.models import F, Q
+from django.db import transaction
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework import viewsets, filters, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
+from .models import Product, StoreStock
+from .serializers import ProductSerializer
+from apps.inventory.models import Store
+from .store_utils import get_current_store  # Import your helper
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ProductViewSet(viewsets.ModelViewSet):
@@ -253,92 +754,507 @@ class ProductViewSet(viewsets.ModelViewSet):
     ordering_fields = ["name", "selling_price", "created_at"]
     ordering = ["name"]
 
+    def get_queryset(self):
+        user = self.request.user
+        qs = Product.objects.all().select_related("category")
+        
+        # Get context from query parameter (default to 'inventory' for admins, 'pos' for others)
+        context = self.request.query_params.get('context', '')
+        store_mode = self.request.query_params.get('store_mode', '')
+        
+        # Determine if this is a POS request
+        is_pos_request = context == 'pos' or store_mode == 'store'
+        
+        # 👑 ADMIN / MANAGER
+        if user.is_superuser or user.role in ["admin", "manager"]:
+            # For POS requests, filter by store (admin acting as cashier)
+            if is_pos_request:
+                try:
+                    store = get_current_store(self.request)
+                    if store:
+                        return qs.filter(
+                            storestock__store=store,
+                            storestock__quantity__gt=0
+                        ).distinct()
+                except PermissionDenied:
+                    pass
+                return qs.none()
+            
+            # For inventory management, show ALL products
+            return qs.distinct()
+
+        # 👤 NORMAL USER (cashier, salesperson)
+        # Always enforce store filtering for POS
+        try:
+            store = get_current_store(self.request)
+            if store:
+                return qs.filter(
+                    storestock__store=store,
+                    storestock__quantity__gt=0
+                ).distinct()
+        except PermissionDenied:
+            pass
+        
+        # If no store selected or permission denied, return empty
+        return qs.none()
+
     @action(detail=False, methods=["get"], url_path="low_stock")
     def low_stock(self, request):
-        print("\n[PRODUCT API] low_stock called")
-        low_stock_items = self.queryset.filter(stock__lt=10)
-        print("[PRODUCT API] Low stock count:", low_stock_items.count())
-        serializer = self.get_serializer(low_stock_items, many=True)
-        return Response(serializer.data)
+        try:
+            store = get_current_store(request)
+            if not store:
+                return Response({"error": "No store selected"}, status=400)
+            
+            # Get context to determine if admin wants store-specific or global view
+            context = request.query_params.get('context', 'pos')
+            user = request.user
+            is_admin = user.is_superuser or user.role in ["admin", "manager"]
+            
+            if context == 'inventory' and is_admin:
+                # Admin viewing low stock across ALL stores
+                from django.db.models import Sum, Min, OuterRef, Subquery
+                
+                # Get products that are low in ANY store
+                low_stock_products = Product.objects.filter(
+                    storestock__quantity__lte=F('reorder_level')
+                ).distinct()
+                
+                # Annotate with total stock across all stores
+                low_stock_products = low_stock_products.annotate(
+                    total_stock=Sum('storestock__quantity'),
+                    min_stock=Min('storestock__quantity')
+                )
+                
+                serializer = self.get_serializer(low_stock_products, many=True)
+                return Response({
+                    "context": "inventory",
+                    "stores": "all",
+                    "count": low_stock_products.count(),
+                    "results": serializer.data
+                })
+            else:
+                # Store-specific low stock (for POS or non-admin)
+                qs = Product.objects.filter(
+                    storestock__store=store,
+                    storestock__quantity__lte=F("reorder_level")
+                ).distinct()
+                
+                serializer = self.get_serializer(qs, many=True)
+                return Response({
+                    "context": "pos",
+                    "store_id": store.id,
+                    "store_name": store.name,
+                    "count": qs.count(),
+                    "results": serializer.data
+                })
+            
+        except PermissionDenied as e:
+            return Response({"error": str(e)}, status=403)
+
+    # @action(detail=False, methods=["get"], url_path="search_products")
+    # def search_products(self, request):
+    #     print("\n" + "="*50)
+    #     print("[PRODUCT API] search_products called")
+    #     print("="*50)
+        
+    #     query = request.query_params.get("q", "")
+    #     category = request.query_params.get("category")
+    #     context = request.query_params.get('context', 'inventory')  # 'inventory' or 'pos'
+    #     store_mode = request.query_params.get('store_mode', '')
+        
+    #     print(f"[PRODUCT API] Search query: '{query}'")
+    #     print(f"[PRODUCT API] Category filter: '{category}'")
+    #     print(f"[PRODUCT API] Context: '{context}'")
+    #     print(f"[PRODUCT API] Store mode: '{store_mode}'")
+    #     print(f"[PRODUCT API] User: {request.user.display_name} (Role: {request.user.role})")
+        
+    #     # Get the base queryset based on user role
+    #     user = request.user
+    #     qs = Product.objects.all().select_related("category")
+    #     is_admin = user.is_superuser or user.role in ["admin", "manager"]
+        
+    #     print(f"\n[STEP 1] Initial queryset count: {qs.count()}")
+    #     print(f"[STEP 1a] Is Admin: {is_admin}")
+        
+    #     # Determine filtering strategy based on context and user role
+    #     force_store_filter = False
+        
+    #     # POS context always forces store filtering
+    #     if context == 'pos':
+    #         print(f"\n[STEP 2] POS CONTEXT - enforcing store filter")
+    #         force_store_filter = True
+    #     # Non-admin users always have store filter
+    #     elif not is_admin:
+    #         print(f"\n[STEP 2] NON-ADMIN USER - enforcing store filter")
+    #         force_store_filter = True
+    #     # Admin in inventory mode - NO store filter
+    #     else:
+    #         print(f"\n[STEP 2] ADMIN IN INVENTORY MODE - showing all products")
+    #         force_store_filter = False
+        
+    #     # Apply store filter if needed
+    #     if force_store_filter:
+    #         try:
+    #             store = get_current_store(request)
+    #             if store:
+    #                 print(f"[STEP 2a] Current store: {store.name} (ID: {store.id})")
+    #                 print(f"[STEP 2b] Filtering products by store_id={store.id}")
+                    
+    #                 # Apply store filter and ensure we only get products with stock > 0 for POS
+    #                 if context == 'pos':
+    #                     qs = qs.filter(
+    #                         storestock__store=store,
+    #                         storestock__quantity__gt=0
+    #                     ).distinct()
+    #                     print(f"[STEP 2c] POS mode - only products with stock > 0")
+    #                 else:
+    #                     qs = qs.filter(storestock__store=store).distinct()
+    #                     print(f"[STEP 2c] Store mode - all products in store (including zero stock)")
+                    
+    #                 print(f"[STEP 2d] After store filter count: {qs.count()}")
+                    
+    #                 # Print first 5 products after store filter
+    #                 print(f"\n[PRODUCTS IN STORE {store.name}]:")
+    #                 for idx, p in enumerate(qs[:5], 1):
+    #                     stock = StoreStock.objects.filter(store=store, product=p).first()
+    #                     stock_qty = stock.quantity if stock else 0
+    #                     print(f"  {idx}. {p.name} (ID: {p.id}) - Stock: {stock_qty}")
+    #             else:
+    #                 print(f"[STEP 2a] No store selected! Returning error")
+    #                 return Response(
+    #                     {"error": "No store selected. Please select a store first."}, 
+    #                     status=400
+    #                 )
+    #         except PermissionDenied as e:
+    #             print(f"[STEP 2 ERROR] Permission denied: {str(e)}")
+    #             return Response({"error": str(e)}, status=403)
+    #     else:
+    #         print(f"\n[STEP 2] ADMIN INVENTORY MODE - showing ALL products from all stores")
+    #         # For admin inventory view, also show products with zero stock across all stores
+    #         qs = qs.all()
+    #         print(f"[STEP 2a] Total products in system: {qs.count()}")
+        
+    #     # Filter by query if provided
+    #     if query:
+    #         print(f"\n[STEP 3] Applying search filter for: '{query}'")
+    #         old_count = qs.count()
+    #         qs = qs.filter(
+    #             Q(name__icontains=query) | 
+    #             Q(sku__icontains=query) | 
+    #             Q(barcode__icontains=query)
+    #         )
+    #         print(f"[STEP 3a] Products found matching '{query}': {qs.count()} (was {old_count})")
+            
+    #         # Print matching products
+    #         for idx, p in enumerate(qs[:5], 1):
+    #             print(f"  {idx}. {p.name} (SKU: {p.sku}) - Matches search")
+    #     else:
+    #         print(f"\n[STEP 3] No search query provided - skipping name filter")
+        
+    #     # Filter by category if provided
+    #     if category:
+    #         print(f"\n[STEP 4] Applying category filter for ID: '{category}'")
+    #         old_count = qs.count()
+    #         qs = qs.filter(category_id=category)
+    #         print(f"[STEP 4a] Products in category {category}: {qs.count()} (was {old_count})")
+            
+    #         # Print matching products
+    #         for idx, p in enumerate(qs[:5], 1):
+    #             print(f"  {idx}. {p.name} - Category ID: {p.category_id}")
+    #     else:
+    #         print(f"\n[STEP 4] No category filter provided - skipping category filter")
+        
+    #     # Final results
+    #     print(f"\n[STEP 5] FINAL RESULTS")
+    #     print(f"[STEP 5a] Total products after all filters: {qs.count()}")
+        
+    #     # Get the final queryset (limit to 50 for performance)
+    #     final_qs = qs[:50]
+    #     print(f"[STEP 5b] Returning first {len(final_qs)} products (limited to 50)")
+        
+    #     # Print detailed results with stock information
+    #     print(f"\n[FINAL PRODUCTS LIST]:")
+    #     current_store = None
+    #     if force_store_filter:
+    #         try:
+    #             current_store = get_current_store(request)
+    #         except:
+    #             pass
+                
+    #     for idx, product in enumerate(final_qs, 1):
+    #         if current_store:
+    #             # Show stock for current store
+    #             stock_item = StoreStock.objects.filter(store=current_store, product=product).first()
+    #             stock_qty = stock_item.quantity if stock_item else 0
+    #             print(f"  {idx}. ID:{product.id} | Name:{product.name} | Price:{product.selling_price} | Store Stock:{stock_qty}")
+    #         else:
+    #             # For admin inventory view, show stock across all stores
+    #             total_stock = StoreStock.objects.filter(product=product).aggregate(total=models.Sum('quantity'))['total'] or 0
+    #             store_count = StoreStock.objects.filter(product=product).count()
+    #             print(f"  {idx}. ID:{product.id} | Name:{product.name} | Price:{product.selling_price} | Total Stock:{total_stock} (in {store_count} stores)")
+        
+    #     # Serialize and return
+    #     serializer = self.get_serializer(final_qs, many=True)
+        
+    #     # Add context metadata to response
+    #     response_data = {
+    #         "context": context,
+    #         "store_filtered": force_store_filter,
+    #         "count": len(final_qs),
+    #         "results": serializer.data
+    #     }
+        
+    #     if current_store:
+    #         response_data["store"] = {
+    #             "id": current_store.id,
+    #             "name": current_store.name
+    #         }
+        
+    #     print(f"\n[STEP 6] Serialized {len(serializer.data)} products to JSON")
+    #     print("="*50 + "\n")
+        
+    #     return Response(response_data)
 
     @action(detail=False, methods=["get"], url_path="search_products")
     def search_products(self, request):
-        print("\n[PRODUCT API] search_products called")
+        print("\n" + "="*50)
+        print("[PRODUCT API] search_products called")
+        print("="*50)
+        
         query = request.query_params.get("q", "")
         category = request.query_params.get("category")
-        print("[PRODUCT API] Search query:", query)
-        print("[PRODUCT API] Category filter:", category)
-
-        qs = self.queryset
-
-        # Filter by query if provided
+        context = request.query_params.get('context', 'inventory')
+        store_mode = request.query_params.get('store_mode', '')
+        
+        print(f"[PRODUCT API] Search query: '{query}'")
+        print(f"[PRODUCT API] Category filter: '{category}'")
+        print(f"[PRODUCT API] Context: '{context}'")
+        print(f"[PRODUCT API] Store mode: '{store_mode}'")
+        print(f"[PRODUCT API] User: {request.user.display_name} (Role: {request.user.role})")
+        
+        user = request.user
+        qs = Product.objects.all().select_related("category")
+        is_admin = user.is_superuser or user.role in ["admin", "manager"]
+        
+        print(f"\n[STEP 1] Initial queryset count: {qs.count()}")
+        print(f"[STEP 1a] Is Admin: {is_admin}")
+        
+        # Determine filtering strategy
+        force_store_filter = False
+        is_pos_context = (context == 'pos' or store_mode == 'store')
+        
+        # POS context always forces store filtering with stock > 0
+        if is_pos_context:
+            print(f"\n[STEP 2] POS CONTEXT - enforcing store filter with stock > 0")
+            force_store_filter = True
+            show_only_in_stock = True  # ← CRITICAL: Always true for POS
+        elif not is_admin:
+            print(f"\n[STEP 2] NON-ADMIN USER - enforcing store filter")
+            force_store_filter = True
+            show_only_in_stock = True  # Non-admins also only see in-stock
+        else:
+            print(f"\n[STEP 2] ADMIN IN INVENTORY MODE - showing all products")
+            force_store_filter = False
+            show_only_in_stock = False
+        
+        # Apply store filter if needed
+        if force_store_filter:
+            try:
+                store = get_current_store(request)
+                if store:
+                    print(f"[STEP 2a] Current store: {store.name} (ID: {store.id})")
+                    print(f"[STEP 2b] Filtering products by store_id={store.id}")
+                    print(f"[STEP 2c] Show only in-stock products: {show_only_in_stock}")
+                    
+                    # CRITICAL FIX: Always use quantity__gt=0 for POS
+                    if show_only_in_stock:
+                        qs = qs.filter(
+                            storestock__store=store,
+                            storestock__quantity__gt=0  # ← Only positive stock
+                        ).distinct()
+                        print(f"[STEP 2d] POS mode - only products with stock > 0")
+                    else:
+                        qs = qs.filter(storestock__store=store).distinct()
+                        print(f"[STEP 2d] Inventory mode - all products in store")
+                    
+                    print(f"[STEP 2e] After store filter count: {qs.count()}")
+                    
+                    # Print products after filter for debugging
+                    print(f"\n[PRODUCTS IN STORE {store.name} (stock > 0 only)]:")
+                    for idx, p in enumerate(qs[:10], 1):
+                        stock = StoreStock.objects.filter(store=store, product=p).first()
+                        stock_qty = stock.quantity if stock else 0
+                        print(f"  {idx}. {p.name} (ID: {p.id}) - Stock: {stock_qty}")
+                else:
+                    print(f"[STEP 2a] No store selected! Returning error")
+                    return Response(
+                        {"error": "No store selected. Please select a store first."}, 
+                        status=400
+                    )
+            except PermissionDenied as e:
+                print(f"[STEP 2 ERROR] Permission denied: {str(e)}")
+                return Response({"error": str(e)}, status=403)
+        else:
+            print(f"\n[STEP 2] ADMIN INVENTORY MODE - showing ALL products from all stores")
+            qs = qs.all()
+            print(f"[STEP 2a] Total products in system: {qs.count()}")
+        
+        # Apply search and category filters (same as before)
         if query:
+            print(f"\n[STEP 3] Applying search filter for: '{query}'")
+            old_count = qs.count()
             qs = qs.filter(
-                name__icontains=query
+                Q(name__icontains=query) | 
+                Q(sku__icontains=query) | 
+                Q(barcode__icontains=query)
             )
-
-        # Filter by category if provided
+            print(f"[STEP 3a] Products found: {qs.count()} (was {old_count})")
+        else:
+            print(f"\n[STEP 3] No search query provided")
+        
         if category:
+            print(f"\n[STEP 4] Applying category filter for ID: '{category}'")
+            old_count = qs.count()
             qs = qs.filter(category_id=category)
+            print(f"[STEP 4a] Products in category: {qs.count()} (was {old_count})")
+        else:
+            print(f"\n[STEP 4] No category filter provided")
+        
+        # Final results
+        print(f"\n[STEP 5] FINAL RESULTS")
+        print(f"[STEP 5a] Total products after all filters: {qs.count()}")
+        
+        final_qs = qs[:50]
+        print(f"[STEP 5b] Returning {len(final_qs)} products")
+        
+        # Print detailed results
+        print(f"\n[FINAL PRODUCTS LIST]:")
+        current_store = None
+        if force_store_filter:
+            try:
+                current_store = get_current_store(request)
+            except:
+                pass
+        
+        total_stock_sum = 0        
+        for idx, product in enumerate(final_qs, 1):
+            if current_store:
+                stock_item = StoreStock.objects.filter(store=current_store, product=product).first()
+                stock_qty = stock_item.quantity if stock_item else 0
+                total_stock_sum += stock_qty
+                print(f"  {idx}. ID:{product.id} | {product.name} | Stock in current store: {stock_qty}")
+            else:
+                total_stock = StoreStock.objects.filter(product=product).aggregate(total=models.Sum('quantity'))['total'] or 0
+                print(f"  {idx}. ID:{product.id} | {product.name} | Total stock across all stores: {total_stock}")
+        
+        print(f"\n[SUMMARY] Total unique products: {len(final_qs)} | Total items in current store: {total_stock_sum}")
+        
+        serializer = self.get_serializer(final_qs, many=True)
+        
+        response_data = {
+            "context": "pos" if is_pos_context else context,
+            "store_filtered": force_store_filter,
+            "show_only_in_stock": show_only_in_stock,
+            "count": len(final_qs),
+            "total_items_in_store": total_stock_sum,  # ← ADD THIS: Shows sum of all stock
+            "results": serializer.data
+        }
+        
+        if current_store:
+            response_data["store"] = {
+                "id": current_store.id,
+                "name": current_store.name
+            }
+        
+        print("="*50 + "\n")
+        
+        return Response(response_data)
 
-        print("[PRODUCT API] Result count:", qs.count())
 
-        serializer = self.get_serializer(qs[:50], many=True)
-        print("[PRODUCT API] Serialized count:", len(serializer.data))
-        return Response(serializer.data)
-
-    # @action(detail=True, methods=["post"], url_path="update_store_stock")
-    # def update_store_stock(self, request, pk=None):
-    #     print("\n[PRODUCT API] update_store_stock called")
-    #     product = self.get_object()
-    #     try:
-    #         amount = int(request.data.get("amount", 0))
-    #     except ValueError:
-    #         return Response({"error": "Invalid amount"}, status=400)
-
-    #     if amount == 0:
-    #         return Response({"error": "Amount is required."}, status=400)
-
-    #     old_stock = product.stock
-    #     product.stock += amount
-    #     product.save()
-    #     print("[PRODUCT API] Stock updated:", old_stock, "→", product.stock)
-
-    #     return Response({"message": "Stock updated successfully."})
-
+    @action(detail=True, methods=["get"], url_path="check_stock")
+    def check_stock(self, request, pk=None):
+        """Check if product has sufficient stock in current store for checkout"""
+        product = self.get_object()
+        
+        try:
+            store = get_current_store(request)
+            if not store:
+                return Response(
+                    {"error": "No store selected. Please select a store before checkout."}, 
+                    status=400
+                )
+                
+            quantity_needed = int(request.query_params.get('quantity', 0))
+            
+            store_stock = StoreStock.objects.filter(
+                product=product, 
+                store=store
+            ).first()
+            
+            current_stock = store_stock.quantity if store_stock else 0
+            has_sufficient = current_stock >= quantity_needed
+            
+            return Response({
+                "success": True,
+                "product_id": product.id,
+                "product_name": product.name,
+                "product_sku": product.sku,
+                "store_id": store.id,
+                "store_name": store.name,
+                "current_stock": current_stock,
+                "quantity_needed": quantity_needed,
+                "has_sufficient_stock": has_sufficient,
+                "missing_quantity": max(0, quantity_needed - current_stock),
+                "can_checkout": has_sufficient
+            })
+            
+        except PermissionDenied as e:
+            return Response({"error": str(e)}, status=403)
+        except ValueError:
+            return Response({"error": "Invalid quantity parameter"}, status=400)
 
     @action(detail=True, methods=["post"], url_path="update_store_stock")
     def update_store_stock(self, request, pk=None):
         product = self.get_object()
-
+        
+        # Get store from request or session
         store_id = request.data.get("store_id")
-        action = request.data.get("action", "set")
+        
+        if not store_id:
+            # Try to get from session if not provided
+            try:
+                store = get_current_store(request)
+                if store:
+                    store_id = store.id
+                else:
+                    return Response({"error": "store_id is required or select a store"}, status=400)
+            except PermissionDenied as e:
+                return Response({"error": str(e)}, status=403)
+
+        action_type = request.data.get("action", "set")
 
         try:
             quantity = int(request.data.get("quantity"))
         except (TypeError, ValueError):
             return Response({"error": "Invalid quantity"}, status=400)
 
-        if not store_id:
-            return Response({"error": "store_id is required"}, status=400)
-
         # get or create stock row
-        store_stock, _ = StoreStock.objects.get_or_create(
+        store_stock, created = StoreStock.objects.get_or_create(
             product=product,
             store_id=store_id,
             defaults={"quantity": 0}
         )
 
-        if action == "set":
+        if action_type == "set":
             store_stock.quantity = quantity
             store_stock.save()
 
-        elif action == "add":
+        elif action_type == "add":
             StoreStock.objects.filter(id=store_stock.id).update(
                 quantity=F("quantity") + quantity
             )
 
-        elif action == "remove":
+        elif action_type == "remove":
             with transaction.atomic():
                 stock = StoreStock.objects.select_for_update().get(id=store_stock.id)
 
@@ -349,7 +1265,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                 stock.save()
 
         else:
-            return Response({"error": "Invalid action"}, status=400)
+            return Response({"error": "Invalid action. Use 'set', 'add', or 'remove'"}, status=400)
 
         store_stock.refresh_from_db()
 
@@ -374,21 +1290,80 @@ class ProductViewSet(viewsets.ModelViewSet):
     def restock(self, request, pk=None):
         print("\n[PRODUCT API] restock called")
         product = self.get_object()
+        
         try:
             qty = int(request.data.get("qty", 0))
         except ValueError:
             return Response({"error": "Invalid quantity"}, status=400)
 
         if qty <= 0:
-            return Response({"error": "Invalid quantity"}, status=400)
+            return Response({"error": "Quantity must be greater than 0"}, status=400)
 
-        old_stock = product.stock
-        product.stock += qty
-        product.save()
-        print("[PRODUCT API] Stock updated:", old_stock, "→", product.stock)
+        # Get the store
+        try:
+            store = get_current_store(request)
+            if not store:
+                return Response({"error": "No store selected"}, status=400)
+        except PermissionDenied as e:
+            return Response({"error": str(e)}, status=403)
+        
+        # Update store stock, not global product stock
+        store_stock, created = StoreStock.objects.get_or_create(
+            product=product,
+            store=store,
+            defaults={"quantity": 0}
+        )
+        
+        old_stock = store_stock.quantity
+        store_stock.quantity += qty
+        store_stock.save()
+        
+        print("[PRODUCT API] Stock updated:", old_stock, "→", store_stock.quantity)
 
-        return Response({"message": "Product restocked", "stock": product.stock})
+        return Response({
+            "message": "Product restocked successfully",
+            "store_id": store.id,
+            "product_id": product.id,
+            "old_quantity": old_stock,
+            "new_quantity": store_stock.quantity
+        })
 
+    @action(detail=False, methods=["get"], url_path="store_products_summary")
+    def store_products_summary(self, request):
+        """Get a summary of products across all stores (admin only)"""
+        user = request.user
+        
+        # Check if user is admin
+        if not (user.is_superuser or user.role in ["admin", "manager"]):
+            return Response({"error": "Permission denied"}, status=403)
+        
+        from django.db.models import Sum, Count, Avg
+        
+        # Get all stores
+        stores = Store.objects.all()
+        
+        summary = []
+        for store in stores:
+            store_summary = {
+                "store_id": store.id,
+                "store_name": store.name,
+                "total_products": StoreStock.objects.filter(store=store).count(),
+                "total_stock_value": StoreStock.objects.filter(store=store).aggregate(
+                    total=models.Sum(models.F('quantity') * models.F('product__selling_price'))
+                )['total'] or 0,
+                "low_stock_count": StoreStock.objects.filter(
+                    store=store,
+                    quantity__lte=models.F('product__reorder_level')
+                ).count(),
+                "out_of_stock_count": StoreStock.objects.filter(store=store, quantity=0).count(),
+                "in_stock_count": StoreStock.objects.filter(store=store, quantity__gt=0).count()
+            }
+            summary.append(store_summary)
+        
+        return Response({
+            "total_stores": stores.count(),
+            "stores": summary
+        })
 
 
 

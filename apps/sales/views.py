@@ -187,19 +187,20 @@ def pos_interface(request):
 
 
 
-@login_required(login_url='/account/login/')
-def my_sales(request):
-    """
-    Render the My Sales page.
-    The actual sales data is fetched via AJAX from /sales/api/my-sales/
-    """
-    user = request.user
-    user_role = getattr(user, 'role', 'user')  # Adjust based on your User model
+# @login_required(login_url='/account/login/')
+# def my_sales(request):
+#     """
+#     Render the My Sales page.
+#     The actual sales data is fetched via AJAX from /sales/api/my-sales/
+#     """
+#     user = request.user
+#     user_role = getattr(user, 'role', 'user')  # Adjust based on your User model
 
-    context = {
-        'user_role': user_role,
-    }
-    return render(request, 'sales/my_sales.html', context)
+#     context = {
+#         'user_role': user_role,
+#     }
+#     return render(request, 'sales/my_sales.html', context)
+
 
 
 
@@ -207,51 +208,158 @@ def my_sales(request):
 @login_required(login_url='/account/login/')
 def sale_detail(request, sale_id):
     """Detailed view of a sale"""
-    sale = get_object_or_404(Sale, sale_id=sale_id)
+    from django.db import models
+    
+    sale = get_object_or_404(
+        Sale.objects
+        .select_related('cashier', 'store')
+        .prefetch_related(
+            models.Prefetch(
+                'items',
+                queryset=SaleItem.objects.select_related('product')
+            )
+        ),
+        sale_id=sale_id
+    )
+    
     user = request.user
-    if user.role in ['cashier'] and sale.cashier != user:
+    if user.role == 'cashier' and sale.cashier != user:
         raise PermissionDenied("You can only view your own sales")
-    context = {'sale': sale}
+    
+    # Get shop settings (from settings or database)
+    from django.conf import settings
+    shop_settings = {
+        'shop_name': getattr(settings, 'SHOP_NAME', 'POS SYSTEM'),
+        'address': getattr(settings, 'SHOP_ADDRESS', '123 Business St, Kenya'),
+        'phone': getattr(settings, 'SHOP_PHONE', '+254 XXX XXX'),
+        'currency': getattr(settings, 'CURRENCY', 'KES'),
+    }
+    
+    context = {
+        'sale': sale,
+        'shop_settings': shop_settings,
+        'receipt_data': sale.get_receipt_data(),  # Tax calculated per product
+    }
     return render(request, 'sales/sale_detail.html', context)
-
-
-
 # ---------------------------
 # API Views
 # ---------------------------
 
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from django.db.models import Prefetch, Count
 
-@api_view(['GET'])
-def api_my_sales(request):
-    """Return sales for the current user, or all sales for managers/admins, with pagination."""
-    user = get_current_user(request)
-    if not user:
-        return Response({'error': 'Authentication required'}, status=401)
+from .models import Sale, SaleItem, Store
+from django.contrib.auth import get_user_model
 
-    date_from = request.GET.get('date_from')
-    date_to = request.GET.get('date_to')
+User = get_user_model()
 
-    # Role-based queryset
-    if user.role in ['admin', 'manager']:
-        sales = Sale.objects.all().prefetch_related('items').order_by('-timestamp')
-    else:  # cashier
-        sales = Sale.objects.filter(cashier=user).prefetch_related('items').order_by('-timestamp')
+
+@login_required(login_url='/account/login/')
+def sales_history(request):
+    """
+    Full POS sales history with:
+    - Role-based access
+    - User-store M2M filtering
+    - Admin/global filtering
+    """
+
+    user = request.user
+
+    # =========================
+    # BASE QUERYSET (OPTIMIZED)
+    # =========================
+    sales = (
+        Sale.objects
+        .select_related('cashier', 'store')
+        .prefetch_related(
+            Prefetch(
+                'items',
+                queryset=SaleItem.objects.select_related('product')
+            )
+        )
+        .annotate(items_count=Count('items'))
+    )
+
+    # =========================
+    # ROLE CHECK
+    # =========================
+    is_admin = user.role == "admin" or user.is_superuser
+    is_manager = user.role == "manager"
+
+    # =========================
+    # STORE ACCESS CONTROL (IMPORTANT FIX)
+    # =========================
+
+    if not is_admin:
+        # limit sales to user's stores
+        sales = sales.filter(store__in=user.stores.all())
+
+    # =========================
+    # CASHIER RESTRICTION
+    # =========================
+    if user.role in ["cashier", "sales"]:
+        sales = sales.filter(cashier=user)
+
+    # =========================
+    # ADMIN / MANAGER FILTERS
+    # =========================
+    if is_admin or is_manager:
+
+        store_id = request.GET.get("store")
+        if store_id:
+            sales = sales.filter(store_id=store_id)
+
+        cashier_id = request.GET.get("cashier")
+        if cashier_id:
+            sales = sales.filter(cashier_id=cashier_id)
+
+    # =========================
+    # DATE FILTERS (ALL ROLES)
+    # =========================
+    date_from = request.GET.get("from")
+    date_to = request.GET.get("to")
 
     if date_from:
         sales = sales.filter(timestamp__date__gte=date_from)
+
     if date_to:
         sales = sales.filter(timestamp__date__lte=date_to)
 
-    # -------------------------------
-    # Pagination
-    # -------------------------------
-    paginator = PageNumberPagination()
-    paginator.page_size = 600  # default items per page
-    result_page = paginator.paginate_queryset(sales, request)
-    serializer = SaleSummarySerializer(result_page, many=True)
-    return paginator.get_paginated_response(serializer.data)
+    # =========================
+    # ORDERING
+    # =========================
+    sales = sales.order_by('-timestamp')
 
+    # =========================
+    # FILTER DROPDOWN DATA
+    # =========================
 
+    # stores user can access
+    if is_admin:
+        stores = Store.objects.all()
+    else:
+        stores = user.stores.all()
+
+    # cashiers (only admin/manager see all users)
+    cashiers = (
+        User.objects.filter(role__in=["cashier", "sales"])
+        if (is_admin or is_manager)
+        else None
+    )
+
+    # =========================
+    # CONTEXT
+    # =========================
+    context = {
+        'sales': sales,
+        'total_sales': sales.count(),
+        'stores': stores,
+        'cashiers': cashiers,
+    }
+
+    return render(request, 'sales/sales_history.html', context)
+    
 # ---------------------------
 # SALE API VIEWS
 # ---------------------------
@@ -301,27 +409,166 @@ def api_my_sales(request):
 
 
 
+# from rest_framework.decorators import api_view, permission_classes
+# from rest_framework.permissions import IsAuthenticated
+# from rest_framework.response import Response
+
+# @api_view(['POST'])
+# @permission_classes([IsAuthenticated])
+# def api_create_sale(request):
+#     user = request.user  # guaranteed to be authenticated
+#     print("=== Incoming Sale Request ===")
+#     print("User:", user.id)
+#     print("Raw Request Data:", request.data)
+
+#     data = request.data.copy()
+#     data['cashier'] = user.id
+
+#     serializer = SaleCreateSerializer(data=data)
+
+#     if serializer.is_valid():
+#         sale = serializer.save()
+#         print("Sale Created:", SaleSerializer(sale).data)
+#         return Response(SaleSerializer(sale).data, status=201)
+#     else:
+#         print("Serializer Errors:", serializer.errors)
+#         return Response(serializer.errors, status=400)
+
+
+from apps.inventory.store_utils import get_current_store  # Import your helper
+
+
+
+from django.db import transaction
+from django.core.exceptions import ValidationError
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import status
+
+
+from apps.inventory.services import InventoryService
+
+# @api_view(['POST'])
+# @permission_classes([IsAuthenticated])
+# def api_create_sale(request):
+#     user = request.user
+#     print('the data is', request.data)
+    
+#     try:
+#         store = get_current_store(request)
+#     except Exception as e:
+#         return Response(
+#             {"error": str(e)},
+#             status=status.HTTP_403_FORBIDDEN
+#         )
+
+#     if not store:
+#         return Response(
+#             {"error": "No store selected"},
+#             status=status.HTTP_400_BAD_REQUEST
+#         )
+
+#     data = request.data.copy()
+#     data['cashier'] = user.id
+
+#     serializer = SaleCreateSerializer(
+#         data=data,
+#         context={'store': store, 'user': user}
+#     )
+
+#     if not serializer.is_valid():
+#         print("Serializer errors:", serializer.errors)  # Add this to see the error
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+#     try:
+#         with transaction.atomic():
+#             # The serializer's create method will handle creating the sale and items
+#             sale = serializer.save()  # Don't create sale again here!
+            
+#             # Now handle stock removal
+#             for item in serializer.validated_data['items']:
+#                 product = Product.objects.get(id=item['product_id'])
+#                 quantity = item['quantity']
+                
+#                 InventoryService.remove_stock(
+#                     product=product,
+#                     store=store,
+#                     quantity=quantity,
+#                     user=user,
+#                     reference=f"SALE_{sale.sale_id}",
+#                     remarks=f"Sale: {quantity} units"
+#                 )
+
+#         return Response({"success": True, "sale_id": str(sale.sale_id)}, status=status.HTTP_201_CREATED)
+
+#     except ValidationError as e:
+#         return Response({"error": e.messages}, status=status.HTTP_400_BAD_REQUEST)
+#     except Exception as e:
+#         print("Error:", str(e))  # Print the actual error
+#         return Response(
+#             {"error": f"Failed to create sale: {str(e)}"},
+#             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#         )
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def api_create_sale(request):
-    user = request.user  # guaranteed to be authenticated
-    print("=== Incoming Sale Request ===")
-    print("User:", user.id)
-    print("Raw Request Data:", request.data)
+    user = request.user
+    print('the data is', request.data)
+
+    try:
+        store = get_current_store(request)
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    if not store:
+        return Response(
+            {"error": "No store selected"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     data = request.data.copy()
     data['cashier'] = user.id
 
-    serializer = SaleCreateSerializer(data=data)
+    serializer = SaleCreateSerializer(
+        data=data,
+        context={'store': store, 'user': user}
+    )
 
-    if serializer.is_valid():
+    if not serializer.is_valid():
+        print("Serializer errors:", serializer.errors)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        # ❌ NO atomic block (DEBUG MODE)
+
         sale = serializer.save()
-        print("Sale Created:", SaleSerializer(sale).data)
-        return Response(SaleSerializer(sale).data, status=201)
-    else:
-        print("Serializer Errors:", serializer.errors)
-        return Response(serializer.errors, status=400)
+
+        for item in serializer.validated_data['items']:
+            product = Product.objects.get(id=item['product_id'])
+            quantity = item['quantity']
+
+            InventoryService.remove_stock(
+                product=product,
+                store=store,
+                quantity=quantity,
+                user=user,
+                reference=f"SALE_{sale.sale_id}",
+                remarks=f"Sale: {quantity} units"
+            )
+
+        return Response(
+            {"success": True, "sale_id": str(sale.sale_id)},
+            status=status.HTTP_201_CREATED
+        )
+
+    except Exception as e:
+        print("FULL ERROR:", str(e))
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

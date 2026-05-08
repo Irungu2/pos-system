@@ -141,25 +141,91 @@ class Product(models.Model):
 
 
 
+# class Store(models.Model):
+#     WAREHOUSE = 'WAREHOUSE'
+#     RETAIL = 'RETAIL'
+#     STORE_TYPES = [
+#         (WAREHOUSE, 'Warehouse'),
+#         (RETAIL, 'Retail Store'),
+#     ]
+    
+#     name = models.CharField(max_length=100)
+#     location = models.CharField(max_length=150, blank=True, null=True)
+#     store_type = models.CharField(max_length=20, choices=STORE_TYPES, default=RETAIL)
+#     is_default_warehouse = models.BooleanField(default=False)
+
+#     def save(self, *args, **kwargs):
+#         if self.is_default_warehouse:
+#             # Ensure only one default warehouse
+#             Store.objects.filter(is_default_warehouse=True).update(is_default_warehouse=False)
+#         super().save(*args, **kwargs)
+
+#     @property
+#     def is_warehouse(self):
+#         return self.store_type == self.WAREHOUSE
+
+#     @property
+#     def is_retail(self):
+#         return self.store_type == self.RETAIL
+
+#     def get_total_products(self):
+#         """Get count of products in this store"""
+#         return self.stocks.count()
+
+#     def get_low_stock_products(self):
+#         """Get products that are low on stock in this store"""
+#         return Product.objects.filter(
+#             storestock__store=self,
+#             storestock__quantity__lte=F('reorder_level')
+#         ).distinct()
+
+#     def __str__(self):
+#         return f"{self.name} ({self.get_store_type_display()})"
+
+
+# from django.db import models
+# from django.db.models import F
+# from django.core.exceptions import ValidationError
+
+
 class Store(models.Model):
     WAREHOUSE = 'WAREHOUSE'
     RETAIL = 'RETAIL'
+
     STORE_TYPES = [
         (WAREHOUSE, 'Warehouse'),
         (RETAIL, 'Retail Store'),
     ]
-    
+
     name = models.CharField(max_length=100)
     location = models.CharField(max_length=150, blank=True, null=True)
-    store_type = models.CharField(max_length=20, choices=STORE_TYPES, default=RETAIL)
+
+    # ✅ keep this as the single source of truth
+    store_type = models.CharField(
+        max_length=20,
+        choices=STORE_TYPES,
+        default=RETAIL
+    )
+
     is_default_warehouse = models.BooleanField(default=False)
 
+    def clean(self):
+        # ✅ enforce business rule: only warehouse can be default
+        if self.is_default_warehouse and self.store_type != self.WAREHOUSE:
+            raise ValidationError("Only a warehouse can be set as default warehouse.")
+
     def save(self, *args, **kwargs):
+        self.clean()
+
         if self.is_default_warehouse:
-            # Ensure only one default warehouse
-            Store.objects.filter(is_default_warehouse=True).update(is_default_warehouse=False)
+            # ✅ exclude self to avoid unnecessary update
+            Store.objects.filter(
+                is_default_warehouse=True
+            ).exclude(pk=self.pk).update(is_default_warehouse=False)
+
         super().save(*args, **kwargs)
 
+    # ✅ use these everywhere instead of checking store_type directly
     @property
     def is_warehouse(self):
         return self.store_type == self.WAREHOUSE
@@ -169,11 +235,9 @@ class Store(models.Model):
         return self.store_type == self.RETAIL
 
     def get_total_products(self):
-        """Get count of products in this store"""
         return self.stocks.count()
 
     def get_low_stock_products(self):
-        """Get products that are low on stock in this store"""
         return Product.objects.filter(
             storestock__store=self,
             storestock__quantity__lte=F('reorder_level')
@@ -182,6 +246,8 @@ class Store(models.Model):
     def __str__(self):
         return f"{self.name} ({self.get_store_type_display()})"
 
+
+        
 
 class StoreStock(models.Model):
     store = models.ForeignKey("inventory.Store", on_delete=models.CASCADE, related_name="stocks")

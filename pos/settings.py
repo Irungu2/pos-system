@@ -173,6 +173,12 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
 ]
 
+# settings.py - Add at the bottom
+SHOP_NAME = 'Vision Heritage'
+SHOP_ADDRESS = '26 Main Street, Luanda, Kenya'
+SHOP_PHONE = '+2547 59900 885'
+CURRENCY = 'KES'
+
 # Logging configuration
 LOGGING = {
     'version': 1,

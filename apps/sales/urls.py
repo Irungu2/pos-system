@@ -17,11 +17,11 @@ urlpatterns = [
     # Template views
     path('', views.sales_dashboard, name='sales_dashboard'),
     path('pos/', views.pos_interface, name='pos_interface'),
-    path('my-sales/', views.my_sales, name='my_sales'),
+    path('my-sales/', views.sales_history, name='my_sales'),
     path('sale/<uuid:sale_id>/', views.sale_detail, name='sale_detail'),
     
     # API endpoints
-    path('api/my-sales/', views.api_my_sales, name='api_my_sales'),
+    # path('api/my-sales/', views.api_my_sales, name='api_my_sales'),
     # path('api/today-sales/', views.api_today_sales, name='api_today_sales'),
     path('api/create-sale/', views.api_create_sale, name='api_create_sale'),
     # path('api/sale/<uuid:sale_id>/', views.api_sale_detail, name='api_sale_detail'),

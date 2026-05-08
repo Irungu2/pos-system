@@ -22,36 +22,78 @@ class SaleItemSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'price', 'tax_amount', 'subtotal']
 
-class SaleItemCreateSerializer(serializers.Serializer):
-    product_id = serializers.IntegerField()
-    quantity = serializers.IntegerField()
-    unit_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+# class SaleItemCreateSerializer(serializers.Serializer):
+#     product_id = serializers.IntegerField()
+#     quantity = serializers.IntegerField()
+#     unit_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
 
-    def validate(self, attrs):
-        product_id = attrs.get('product_id')
-        quantity = attrs.get('quantity')
+#     def validate(self, attrs):
+#         product_id = attrs.get('product_id')
+#         quantity = attrs.get('quantity')
 
-        # Lookup product
-        try:
-            product = Product.objects.get(id=product_id)
-        except Product.DoesNotExist:
-            raise serializers.ValidationError({'product_id': 'Invalid product ID.'})
+#         # Lookup product
+#         try:
+#             product = Product.objects.get(id=product_id)
+#         except Product.DoesNotExist:
+#             raise serializers.ValidationError({'product_id': 'Invalid product ID.'})
+ 
+#         # Stock check
+#         if product.stock_quantity < quantity:
+#             raise serializers.ValidationError(
+#                 {'quantity': f"Insufficient stock for {product.name}. Available: {product.stock_quantity}"}
+#             )
 
-        # Stock check
-        if product.stock_quantity < quantity:
-            raise serializers.ValidationError(
-                {'quantity': f"Insufficient stock for {product.name}. Available: {product.stock_quantity}"}
-            )
+#         # Convert product_id → product instance
+#         attrs['product'] = product
+#         del attrs['product_id']
 
-        # Convert product_id → product instance
-        attrs['product'] = product
-        del attrs['product_id']
+#         # Default unit_price from product
+#         if 'unit_price' not in attrs or product.fixed_price:
+#             attrs['unit_price'] = product.selling_price
 
-        # Default unit_price from product
-        if 'unit_price' not in attrs or product.fixed_price:
-            attrs['unit_price'] = product.selling_price
+#         return attrs
 
-        return attrs
+from rest_framework import serializers
+from apps.inventory.services import InventoryService
+
+# class SaleItemCreateSerializer(serializers.Serializer):
+#     product_id = serializers.IntegerField()
+#     quantity = serializers.IntegerField(min_value=1)
+#     unit_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+
+#     def validate(self, attrs):
+#         product_id = attrs.get('product_id')
+#         quantity = attrs.get('quantity')
+#         store = self.context.get('store')
+
+#         if not store:
+#             raise serializers.ValidationError("Store context is required.")
+
+#         # Get product
+#         try:
+#             product = Product.objects.get(id=product_id)
+#         except Product.DoesNotExist:
+#             raise serializers.ValidationError({'product_id': 'Invalid product ID.'})
+
+#         # ✅ SINGLE SOURCE OF TRUTH
+#         available_stock = InventoryService.get_store_stock(product, store)
+
+#         if available_stock < quantity:
+#             raise serializers.ValidationError({
+#                 'quantity': (
+#                     f"Insufficient stock for {product.name}. "
+#                     f"Available: {available_stock}, Requested: {quantity}"
+#                 )
+#             })
+
+#         attrs['product'] = product
+#         attrs.pop('product_id')
+
+#         # Pricing
+#         if 'unit_price' not in attrs or product.fixed_price:
+#             attrs['unit_price'] = product.selling_price
+
+#         return attrs
 
 class SaleSerializer(serializers.ModelSerializer):
     cashier_name = serializers.CharField(source='cashier.get_full_name', read_only=True)
@@ -70,12 +112,19 @@ class SaleSerializer(serializers.ModelSerializer):
     def get_items_count(self, obj):
         return obj.items.count()
 
+
+
+class SaleItemCreateSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField()  # Changed from 'product'
+    quantity = serializers.IntegerField()
+    unit_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+
 class SaleCreateSerializer(serializers.ModelSerializer):
     items = SaleItemCreateSerializer(many=True)
 
     class Meta:
         model = Sale
-        fields = ['cashier', 'items']  # cashier is writable
+        fields = ['cashier', 'items']
 
     def create(self, validated_data):
         items_data = validated_data.pop('items')
@@ -84,7 +133,7 @@ class SaleCreateSerializer(serializers.ModelSerializer):
         total_amount = 0
 
         for item_data in items_data:
-            product = item_data['product']
+            product = Product.objects.get(id=item_data['product_id'])  # Get product from ID
             quantity = item_data['quantity']
             unit_price = item_data['unit_price']
 
@@ -107,6 +156,7 @@ class SaleCreateSerializer(serializers.ModelSerializer):
 
         return sale
 
+        
 
 class SaleSummarySerializer(serializers.ModelSerializer):
     cashier_name = serializers.CharField(source='cashier.get_full_name', read_only=True)

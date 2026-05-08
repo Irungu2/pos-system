@@ -1,192 +1,402 @@
 {% extends "base.html" %}
-{% block title %}Dashboard | POS System{% endblock %}
+
+{% block title %}
+Dashboard | POS System
+{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto p-6 space-y-8">
 
-    <!-- Page Title -->
-    <div class="flex items-center justify-between">
-        <h1 class="text-3xl font-bold text-gray-700 flex items-center">
-            <i class="fas fa-tachometer-alt mr-3 text-blue-600"></i>
-            Dashboard
-        </h1>
-        {% if user.role in 'admin manager' %}
-            <a href="{% url 'sales_dashboard' %}" 
-               class="bg-blue-600 text-white px-5 py-3 rounded-lg shadow-lg hover:bg-blue-700 transition font-semibold">
-               <i class="fas fa-shopping-cart mr-2"></i> Start POS
-            </a>
-        {% endif %}
-    </div>
+<!-- HEADER -->
+<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
 
-    <!-- KPI Stats -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <!-- Today’s Sales -->
-        <div class="bg-white shadow-md rounded-xl p-6 border-l-4 border-blue-500 relative">
-            <p class="text-gray-500 text-sm uppercase">Today’s Sales</p>
-            <h2 class="text-2xl font-bold mt-2">Kes. {{ todays_sales|floatformat:2 }}</h2>
-            <i class="fas fa-coins text-blue-500 text-3xl absolute top-4 right-4"></i>
-        </div>
+    {% if user.role == 'admin' or user.role == 'manager' or user.role == 'cashier' or user.role == 'sales' %}
 
-        <!-- Transactions -->
-        <div class="bg-white shadow-md rounded-xl p-6 border-l-4 border-green-500 relative">
-            <p class="text-gray-500 text-sm uppercase">Transactions</p>
-            <h2 class="text-2xl font-bold mt-2">{{ transactions }}</h2>
-            <i class="fas fa-receipt text-green-500 text-3xl absolute top-4 right-4"></i>
-        </div>
+    <a href="{% url 'sales_dashboard' %}"
+       class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl font-semibold shadow transition">
+        <i class="fas fa-shopping-cart mr-2"></i>
+        Start POS
+    </a>
 
-        <!-- Low Stock -->
-        <div class="bg-white shadow-md rounded-xl p-6 border-l-4 border-yellow-500 relative">
-            <p class="text-gray-500 text-sm uppercase">Low Stock</p>
-            {% if low_stock_info %}
-                <h2 class="text-2xl font-bold mt-2">{{ low_stock_total }}</h2>
-            {% else %}
-                <h2 class="text-2xl font-bold mt-2">0</h2>
-            {% endif %}
-            <i class="fas fa-box-open text-yellow-500 text-3xl absolute top-4 right-4"></i>
-        </div>
+    {% endif %}
+</div>
 
-        <!-- Alerts -->
-        <div class="bg-white shadow-md rounded-xl p-6 border-l-4 border-red-500 relative">
-            <p class="text-gray-500 text-sm uppercase">Alerts (Out of Stock)</p>
-            {% if alerts_info %}
-                <h2 class="text-2xl font-bold mt-2">{{ alerts_total  }}</h2>
-            {% else %}
-                <h2 class="text-2xl font-bold mt-2">0</h2>
-            {% endif %}
-            <i class="fas fa-exclamation-circle text-red-500 text-3xl absolute top-4 right-4"></i>
+<!-- STATS -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+
+    <!-- SALES -->
+    <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-blue-600">
+        <div class="flex items-center justify-between">
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Today's Sales
+                </p>
+
+                <h2 class="text-2xl font-bold text-gray-800 mt-2">
+                    Kes. {{ todays_sales|floatformat:2|default:"0.00" }}
+                </h2>
+            </div>
+
+            <i class="fas fa-coins text-4xl text-blue-200"></i>
+
         </div>
     </div>
 
-    <!-- Main Content -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- TRANSACTIONS -->
+    <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-green-600">
+        <div class="flex items-center justify-between">
 
-        <!-- Recent Sales -->
-        <div class="bg-white rounded-xl shadow-md p-6">
-            <h2 class="text-xl font-semibold mb-4 flex items-center">
-                <i class="fas fa-list mr-2 text-blue-500"></i> Recent Sales
+            <div>
+                <p class="text-sm text-gray-500">
+                    Transactions
+                </p>
+
+                <h2 class="text-2xl font-bold text-gray-800 mt-2">
+                    {{ transactions|default:"0" }}
+                </h2>
+            </div>
+
+            <i class="fas fa-receipt text-4xl text-green-200"></i>
+
+        </div>
+    </div>
+
+    {% if user.role == 'admin' or user.role == 'manager' %}
+
+    <!-- LOW STOCK -->
+    <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-yellow-500">
+        <div class="flex items-center justify-between">
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Low Stock
+                </p>
+
+                <h2 class="text-2xl font-bold text-gray-800 mt-2">
+                    {{ low_stock_total|default:"0" }}
+                </h2>
+            </div>
+
+            <i class="fas fa-box-open text-4xl text-yellow-200"></i>
+
+        </div>
+    </div>
+
+    <!-- OUT OF STOCK -->
+    <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-red-600">
+        <div class="flex items-center justify-between">
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Out Of Stock
+                </p>
+
+                <h2 class="text-2xl font-bold text-gray-800 mt-2">
+                    {{ alerts_total|default:"0" }}
+                </h2>
+            </div>
+
+            <i class="fas fa-exclamation-circle text-4xl text-red-200"></i>
+
+        </div>
+    </div>
+
+    {% endif %}
+
+</div>
+
+<!-- MAIN GRID -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+    <!-- RECENT SALES -->
+    <div class="lg:col-span-2 bg-white rounded-2xl shadow overflow-hidden">
+
+        <div class="p-5 border-b">
+            <h2 class="font-bold text-lg text-gray-800 flex items-center gap-2">
+                <i class="fas fa-list text-blue-600"></i>
+                Recent Sales
             </h2>
+        </div>
 
-            {% if recent_sales %}
-                <ul class="divide-y">
+        {% if recent_sales %}
+
+        <div class="overflow-x-auto">
+
+            <table class="w-full">
+
+                <thead class="bg-gray-50">
+
+                    <tr>
+                        <th class="text-left p-4 text-sm font-semibold text-gray-600">
+                            Sale ID
+                        </th>
+
+                        <th class="text-left p-4 text-sm font-semibold text-gray-600">
+                            Amount
+                        </th>
+
+                        <th class="text-left p-4 text-sm font-semibold text-gray-600">
+                            Time
+                        </th>
+
+                        <th class="text-left p-4 text-sm font-semibold text-gray-600">
+                            Action
+                        </th>
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
                     {% for sale in recent_sales %}
-                        <li class="py-3 flex justify-between items-center">
-                            <div>
-                                <span class="font-medium">Sale #{{ sale.sale_id }}</span>
-                                <span class="ml-2 text-gray-500">Kes. {{ sale.total_amount|floatformat:2 }}</span>
-                            </div>
-                            <a href="{% url 'sale_detail' sale.sale_id %}" 
-                               class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1 rounded-lg transition">
+
+                    <tr class="border-t hover:bg-gray-50">
+
+                        <td class="p-4">
+                            #{{ sale.sale_id }}
+                        </td>
+
+                        <td class="p-4">
+                            Kes. {{ sale.total_amount|floatformat:2 }}
+                        </td>
+
+                        <td class="p-4">
+                            {{ sale.timestamp|date:"H:i" }}
+                        </td>
+
+                        <td class="p-4">
+                            <a href="{% url 'sale_detail' sale.sale_id %}"
+                               class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm transition">
                                 View
                             </a>
-                        </li>
+                        </td>
+
+                    </tr>
+
                     {% endfor %}
-                </ul>
-            {% else %}
-                <p class="text-gray-500 text-sm italic">No recent sales found.</p>
-            {% endif %}
+
+                </tbody>
+
+            </table>
+
         </div>
 
-        <!-- Quick Actions & Stock Info -->
-        <div class="space-y-6">
+        {% else %}
 
-            <!-- Quick Actions -->
-            <div class="bg-white rounded-xl shadow-md p-6">
-                <h2 class="text-xl font-semibold mb-4 flex items-center">
-                    <i class="fas fa-bolt mr-2 text-green-500"></i> Quick Actions
-                </h2>
+        <div class="p-5 text-gray-500 italic">
+            No recent sales found.
+        </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <a href="{% url 'sales_dashboard' %}" 
-                       class="bg-blue-600 text-white text-center py-3 rounded-lg hover:bg-blue-700 transition">
-                        <i class="fas fa-shopping-cart mb-1"></i><br>
-                        Start POS
-                    </a>
-                    <a href="{% url 'my_sales' %}" 
-                       class="bg-blue-600 text-white text-center py-3 rounded-lg hover:bg-blue-700 transition">
-                        <i class="fas fa-shopping-cart mb-1"></i><br>
-                        My Sales
-                    </a>
+        {% endif %}
 
+    </div>
 
-                    {% if user.role in 'admin manager' %}
-                    <a href="{% url 'manager_dashboard' %}" 
-                       class="bg-green-600 text-white text-center py-3 rounded-lg hover:bg-green-700 transition">
-                        <i class="fas fa-chart-line mb-1"></i><br>
-                        Reports
-                    </a>
+    <!-- QUICK ACTIONS -->
+    <div class="bg-white rounded-2xl shadow p-5">
 
-                    <a href="/admin/inventory/product/" 
-                       class="bg-yellow-500 text-white text-center py-3 rounded-lg hover:bg-yellow-600 transition">
-                        <i class="fas fa-boxes mb-1"></i><br>
-                        Inventory
-                    </a>
+        <h2 class="font-bold text-lg text-gray-800 flex items-center gap-2 mb-5">
+            <i class="fas fa-bolt text-yellow-500"></i>
+            Quick Actions
+        </h2>
 
-                    <a href="{% url 'inventory:admin' %}" 
-                       class="bg-gray-700 text-white text-center py-3 rounded-lg hover:bg-gray-800 transition">
-                        <i class="fas fa-tools mb-1"></i><br>
-                        Inventory Summary
-                    </a>
+        <div class="grid grid-cols-2 gap-4">
 
-                    {% endif %}
-                </div>
-            </div>
+            <a href="{% url 'sales_dashboard' %}"
+               class="bg-blue-600 hover:bg-blue-700 text-white p-5 rounded-2xl text-center transition">
 
-            <!-- Low Stock & Alerts Details -->
-            <div class="grid grid-cols-1 gap-6">
-                <!-- Low Stock Details -->
-                <div class="bg-white rounded-xl shadow-md p-6">
-                    <h2 class="text-xl font-semibold mb-4 flex items-center">
-                        <i class="fas fa-box-open mr-2 text-yellow-500"></i> Low Stock Products
-                    </h2>
-                    {% if low_stock_info %}
-                        <ul class="text-gray-700 text-sm space-y-2">
-                            {% for info in low_stock_info %}
-                                {% if info.count > 0 %}
-                                <li>
-                                    <strong>{{ info.store.name }}:</strong> {{ info.count }} products
-                                    <ul class="ml-4 list-disc space-y-1">
-                                        {% for product in info.products %}
-                                            <li>{{ product.name }} (SKU: {{ product.sku }})</li>
-                                        {% endfor %}
-                                    </ul>
-                                </li>
-                                {% endif %}
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p class="text-gray-500 italic">No low stock products.</p>
-                    {% endif %}
+                <i class="fas fa-shopping-cart text-2xl mb-3"></i>
+
+                <div class="font-semibold">
+                    POS
                 </div>
 
-                <!-- Alerts Details -->
-                <div class="bg-white rounded-xl shadow-md p-6">
-                    <h2 class="text-xl font-semibold mb-4 flex items-center">
-                        <i class="fas fa-exclamation-circle mr-2 text-red-500"></i> Alerts (Out of Stock)
-                    </h2>
-                    {% if alerts_info %}
-                        <ul class="text-gray-700 text-sm space-y-2">
-                            {% for info in alerts_info %}
-                                {% if info.count > 0 %}
-                                <li>
-                                    <strong>{{ info.store.name }}:</strong> {{ info.count }} products
-                                    <ul class="ml-4 list-disc space-y-1">
-                                        {% for product in info.products %}
-                                            <li>{{ product.name }} (SKU: {{ product.sku }})</li>
-                                        {% endfor %}
-                                    </ul>
-                                </li>
-                                {% endif %}
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p class="text-gray-500 italic">No out-of-stock products.</p>
-                    {% endif %}
+            </a>
+
+            <a href="{% url 'my_sales' %}"
+               class="bg-green-600 hover:bg-green-700 text-white p-5 rounded-2xl text-center transition">
+
+                <i class="fas fa-chart-line text-2xl mb-3"></i>
+
+                <div class="font-semibold">
+                    My Sales
                 </div>
-            </div>
+
+            </a>
+
+            {% if user.role == 'admin' or user.role == 'manager' %}
+
+            <a href="{% url 'inventory:admin' %}"
+               class="bg-yellow-500 hover:bg-yellow-600 text-white p-5 rounded-2xl text-center transition">
+
+                <i class="fas fa-boxes text-2xl mb-3"></i>
+
+                <div class="font-semibold">
+                    Inventory
+                </div>
+
+            </a>
+
+            <a href="{% url 'manager_dashboard' %}"
+               class="bg-purple-600 hover:bg-purple-700 text-white p-5 rounded-2xl text-center transition">
+
+                <i class="fas fa-chart-bar text-2xl mb-3"></i>
+
+                <div class="font-semibold">
+                    Reports
+                </div>
+
+            </a>
+
+            {% endif %}
+
+            <a href="{% url 'logout' %}"
+               class="bg-red-600 hover:bg-red-700 text-white p-5 rounded-2xl text-center transition col-span-2">
+
+                <i class="fas fa-sign-out-alt text-2xl mb-3"></i>
+
+                <div class="font-semibold">
+                    Logout
+                </div>
+
+            </a>
 
         </div>
 
     </div>
 
 </div>
+
+<!-- LOW STOCK & ALERT DETAILS -->
+{% if user.role == 'admin' or user.role == 'manager' %}
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <!-- LOW STOCK PRODUCTS -->
+    <div class="bg-white rounded-2xl shadow overflow-hidden">
+
+        <div class="p-5 border-b">
+            <h2 class="font-bold text-lg text-gray-800 flex items-center gap-2">
+                <i class="fas fa-box-open text-yellow-500"></i>
+                Low Stock Products
+            </h2>
+        </div>
+
+        <div class="p-5">
+
+            {% if low_stock_info %}
+
+                {% for info in low_stock_info %}
+
+                    {% if info.count > 0 %}
+
+                    <div class="mb-6">
+
+                        <h3 class="font-semibold text-gray-700 mb-3">
+                            {{ info.store }}
+                        </h3>
+
+                        <div class="space-y-3">
+
+                            {% for product in info.products %}
+
+                            <div class="flex items-center justify-between border-b pb-2">
+
+                                <span class="text-gray-700">
+                                    {{ product.name }}
+                                </span>
+
+                                <span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm font-semibold">
+                                    Stock: {{ product.stock_quantity }}
+                                </span>
+
+                            </div>
+
+                            {% endfor %}
+
+                        </div>
+
+                    </div>
+
+                    {% endif %}
+
+                {% endfor %}
+
+            {% else %}
+
+            <p class="text-gray-500 italic">
+                No low stock products.
+            </p>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+    <!-- OUT OF STOCK -->
+    <div class="bg-white rounded-2xl shadow overflow-hidden">
+
+        <div class="p-5 border-b">
+            <h2 class="font-bold text-lg text-gray-800 flex items-center gap-2">
+                <i class="fas fa-exclamation-circle text-red-500"></i>
+                Out Of Stock
+            </h2>
+        </div>
+
+        <div class="p-5">
+
+            {% if alerts_info %}
+
+                {% for info in alerts_info %}
+
+                    {% if info.count > 0 %}
+
+                    <div class="mb-6">
+
+                        <h3 class="font-semibold text-gray-700 mb-3">
+                            {{ info.store }}
+                        </h3>
+
+                        <div class="space-y-3">
+
+                            {% for product in info.products %}
+
+                            <div class="flex items-center justify-between border-b pb-2">
+
+                                <span class="text-gray-700">
+                                    {{ product.name }}
+                                </span>
+
+                                <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-semibold">
+                                    OUT OF STOCK
+                                </span>
+
+                            </div>
+
+                            {% endfor %}
+
+                        </div>
+
+                    </div>
+
+                    {% endif %}
+
+                {% endfor %}
+
+            {% else %}
+
+            <p class="text-gray-500 italic">
+                No alerts available.
+            </p>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endif %}
+
 {% endblock %}
