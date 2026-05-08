@@ -21,12 +21,12 @@
 
             <div class="bg-white shadow p-3 rounded">
                 <p class="text-gray-500">Total Sales</p>
-                <p class="font-bold text-lg">{{ total_sales }}</p>
+                <p class="font-bold text-lg">{{ total_sales|default:0 }}</p>
             </div>
 
             <div class="bg-white shadow p-3 rounded">
                 <p class="text-gray-500">Total Records</p>
-                <p class="font-bold text-lg">{{ sales.count }}</p>
+                <p class="font-bold text-lg">{{ sales.count|default:0 }}</p>
             </div>
 
             <div class="bg-white shadow p-3 rounded">
@@ -69,7 +69,7 @@
                 {% for user in cashiers %}
                     <option value="{{ user.id }}"
                         {% if request.GET.cashier == user.id|stringformat:"s" %}selected{% endif %}>
-                        {{ user.get_full_name }}
+                        {{ user.get_full_name|default:user.display_name }}
                     </option>
                 {% endfor %}
             </select>
@@ -80,7 +80,7 @@
         <div>
             <label class="text-sm text-gray-600">From</label>
             <input type="date" name="from"
-                   value="{{ request.GET.from }}"
+                   value="{{ request.GET.from|default:'' }}"
                    class="border rounded px-3 py-2 w-full">
         </div>
 
@@ -88,14 +88,17 @@
         <div>
             <label class="text-sm text-gray-600">To</label>
             <input type="date" name="to"
-                   value="{{ request.GET.to }}"
+                   value="{{ request.GET.to|default:'' }}"
                    class="border rounded px-3 py-2 w-full">
         </div>
 
-        <div class="md:col-span-4">
-            <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        <div class="md:col-span-4 flex gap-2">
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
                 Filter
             </button>
+            <a href="{% url 'my_sales' %}" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+                Clear
+            </a>
         </div>
 
     </form>
@@ -133,21 +136,21 @@
                     </td>
 
                     <td class="p-3">
-                        {{ sale.cashier.get_full_name }}
+                        {{ sale.cashier.get_full_name|default:sale.cashier.display_name }}
                     </td>
 
                     <td class="p-3 text-gray-600">
-                        {{ sale.store }}
+                        {{ sale.store.name|default:sale.store }}
                     </td>
 
                     <td class="p-3">
                         <span class="bg-gray-200 px-2 py-1 rounded text-xs">
-                            {{ sale.items_count }}
+                            {{ sale.items_count|default:0 }}
                         </span>
                     </td>
 
                     <td class="p-3 text-right font-semibold text-green-600">
-                        {{ sale.total_amount|intcomma }}
+                        {{ sale.total_amount|default:0|intcomma }}
                     </td>
 
                     <td class="p-3 text-center">
