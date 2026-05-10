@@ -1,77 +1,93 @@
-# =========================
+# ==========================================
 # Standard Library Imports
-# =========================
-import io
+# ==========================================
 import base64
+import io
 import logging
+from io import BytesIO
 
-# =========================
+# ==========================================
 # Third-Party Imports
-# =========================
+# ==========================================
+import barcode
 import pandas as pd
+from barcode.writer import ImageWriter
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill
-from io import BytesIO
-import barcode
-from barcode.writer import ImageWriter
 
-from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import mm
 from reportlab.lib.units import mm as unit_mm
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
 
-# =========================
+# ==========================================
 # Django Imports
-# =========================
+# ==========================================
+from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
-from django.db.models import Q, F, Sum, Count
-from django.shortcuts import render, get_object_or_404
+from django.db.models import Count, F, Q, Sum
 from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.views.decorators.http import require_http_methods
 
-# =========================
+# ==========================================
 # Django REST Framework Imports
-# =========================
-from rest_framework import viewsets, status, filters
+# ==========================================
+from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError
-from .services import StoreStockService,RestockDebugService
-# =========================
+
+# ==========================================
 # Django Filters
-# =========================
+# ==========================================
 from django_filters.rest_framework import DjangoFilterBackend
 
-# =========================
-# Project Imports
-# =========================
+# ==========================================
+# Project Services
+# ==========================================
+from .services import (
+    RestockDebugService,
+    StoreStockService,
+)
+
+# ==========================================
+# Project Utilities
+# ==========================================
+from .store_utils import get_current_store
+
+# ==========================================
+# Models
+# ==========================================
 from .models import (
-    Category,
-    Product,
-    Store,
-    StoreStock,
-    StockTransaction,
-    StockTransfer,
     BulkRestock,
     BulkRestockItem,
+    Category,
+    Product,
+    StockTransaction,
+    StockTransfer,
+    Store,
+    StoreStock,
 )
 
+# ==========================================
+# Serializers
+# ==========================================
 from .serializers import (
+    BulkRestockSerializer,
     CategorySerializer,
+    POSProductSerializer,
     ProductSerializer,
+    StockTransactionSerializer,
+    StockTransferCreateSerializer,
+    StockTransferSerializer,
     StoreSerializer,
     StoreStockSerializer,
-    StockTransactionSerializer,
-    StockTransferSerializer,
-    StockTransferCreateSerializer,
-    POSProductSerializer,
-    BulkRestockSerializer,
 )
-
 # =========================
 # Logging Setup
 # =========================
@@ -125,19 +141,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 
 
-from django.core.exceptions import PermissionDenied
-from django.db.models import F, Q
-from django.db import transaction
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework import viewsets, filters, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from django_filters.rest_framework import DjangoFilterBackend
-from .models import Product, StoreStock
-from .serializers import ProductSerializer
-from apps.inventory.models import Store
-from .store_utils import get_current_store  # Import your helper
+
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ProductViewSet(viewsets.ModelViewSet):
@@ -908,7 +912,6 @@ class StoreViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(warehouses, many=True)
         return Response(serializer.data)
 
-from .services import StoreStockService
 
 
 class StoreStockViewSet(viewsets.ModelViewSet):
@@ -972,15 +975,25 @@ class StoreStockViewSet(viewsets.ModelViewSet):
                 )
             
             # Call service layer
-            updated_stock = StoreStockService.adjust_stock(
-                stock=stock,
+            # updated_stock = StoreStockService.adjust_stock(
+            #     stock=stock,
+            #     action=action,
+            #     quantity=quantity_int,
+            #     user=request.user,
+            #     notes=notes,
+            # )
+            StoreStockService.adjust_stock(
+                product=stock.product,
+                store=stock.store,
                 action=action,
                 quantity=quantity_int,
                 user=request.user,
-                notes=notes,
+                remarks=notes,
             )
-            
-            serializer = self.get_serializer(updated_stock)
+
+            stock.refresh_from_db()
+
+            serializer = self.get_serializer(stock)
             return Response(serializer.data)
             
         except ValueError as e:
@@ -1177,259 +1190,6 @@ class StockTransactionViewSet(viewsets.ModelViewSet):
         }
 
         return Response(summary)
-
-
-
-
-# @method_decorator(csrf_exempt, name='dispatch')
-# class StockTransferViewSet(viewsets.ModelViewSet):
-#     queryset = StockTransfer.objects.all().select_related(
-#         'product', 'from_store', 'to_store', 'performed_by'
-#     )
-#     serializer_class = StockTransferSerializer
-#     filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
-#     filterset_fields = ['from_store', 'to_store', 'product']
-#     search_fields = ['product__name', 'product__sku', 'notes']
-#     ordering_fields = ['created_at', 'quantity']
-#     ordering = ['-created_at']
-
-#     def get_queryset(self):
-#         queryset = super().get_queryset()
-        
-#         # Date range filtering
-#         date_from = self.request.query_params.get('date_from')
-#         date_to = self.request.query_params.get('date_to')
-        
-#         if date_from:
-#             queryset = queryset.filter(created_at__gte=date_from)
-#         if date_to:
-#             queryset = queryset.filter(created_at__lte=date_to)
-        
-#         # Store type filtering
-#         store_type = self.request.query_params.get('store_type')
-#         if store_type:
-#             queryset = queryset.filter(
-#                 Q(from_store__store_type=store_type) | 
-#                 Q(to_store__store_type=store_type)
-#             )
-        
-#         return queryset
-
-#     # def perform_create(self, serializer):
-#     #     # Auto-assign the current user as performer
-#     #     serializer.save(performed_by=self.request.user)
-
-#     def perform_create(self, serializer):
-#         user = self.request.user if self.request.user.is_authenticated else None
-#         serializer.save(performed_by=user)
-
-#     @action(detail=False, methods=['get'])
-#     def summary(self, request):
-#         """Get transfer summary statistics"""
-#         queryset = self.filter_queryset(self.get_queryset())
-        
-#         summary = {
-#             'total_transfers': queryset.count(),
-#             'total_quantity': queryset.aggregate(
-#                 total=Sum('quantity')
-#             )['total'] or 0,
-#             'today': queryset.filter(
-#                 created_at__date=timezone.now().date()
-#             ).count(),
-#             'by_store': {},
-#         }
-        
-#         # Get unique stores involved
-#         stores = set()
-#         for transfer in queryset:
-#             stores.add(transfer.from_store)
-#             stores.add(transfer.to_store)
-        
-#         for store in stores:
-#             outgoing = queryset.filter(from_store=store).aggregate(
-#                 total=Sum('quantity')
-#             )['total'] or 0
-            
-#             incoming = queryset.filter(to_store=store).aggregate(
-#                 total=Sum('quantity')
-#             )['total'] or 0
-            
-#             summary['by_store'][store.name] = {
-#                 'outgoing': outgoing,
-#                 'incoming': incoming,
-#                 'net': incoming - outgoing
-#             }
-        
-#         return Response(summary)
-
-#     @action(detail=False, methods=['get'])
-#     def recent(self, request):
-#         """Get recent transfers (last 7 days)"""
-#         recent_date = timezone.now() - timezone.timedelta(days=7)
-#         recent_transfers = self.get_queryset().filter(
-#             created_at__gte=recent_date
-#         )[:10]
-        
-#         serializer = self.get_serializer(recent_transfers, many=True)
-#         return Response(serializer.data)
-
-# from django.utils import timezone
-# from django.db.models import Sum, Q
-# from django.db import transaction
-# from rest_framework import viewsets, filters
-# from rest_framework.decorators import action
-# from rest_framework.response import Response
-# from django_filters.rest_framework import DjangoFilterBackend
-
-# @method_decorator(csrf_exempt, name='dispatch')
-# class StockTransferViewSet(viewsets.ModelViewSet):
-
-#     queryset = StockTransfer.objects.all().select_related(
-#         'product', 'from_store', 'to_store', 'performed_by'
-#     )
-#     serializer_class = StockTransferSerializer
-
-#     filter_backends = [
-#         DjangoFilterBackend,
-#         filters.OrderingFilter,
-#         filters.SearchFilter
-#     ]
-
-#     filterset_fields = ['from_store', 'to_store', 'product']
-#     search_fields = ['product__name', 'product__sku', 'notes']
-#     ordering_fields = ['created_at', 'quantity']
-#     ordering = ['-created_at']
-
-#     # -------------------------------------------------
-#     # QUERYSET FILTERING (unchanged but safe)
-#     # -------------------------------------------------
-#     def get_queryset(self):
-#         queryset = super().get_queryset()
-
-#         date_from = self.request.query_params.get('date_from')
-#         date_to = self.request.query_params.get('date_to')
-#         store_type = self.request.query_params.get('store_type')
-
-#         if date_from:
-#             queryset = queryset.filter(created_at__gte=date_from)
-
-#         if date_to:
-#             queryset = queryset.filter(created_at__lte=date_to)
-
-#         if store_type:
-#             queryset = queryset.filter(
-#                 Q(from_store__store_type=store_type) |
-#                 Q(to_store__store_type=store_type)
-#             )
-
-#         return queryset
-
-#     # -------------------------------------------------
-#     # CREATE TRANSFER (IMPORTANT CHANGE)
-#     # -------------------------------------------------
-#     @transaction.atomic
-#     def perform_create(self, serializer):
-
-#         user = self.request.user if self.request.user.is_authenticated else None
-
-#         from_store = serializer.validated_data['from_store']
-#         to_store = serializer.validated_data['to_store']
-#         product = serializer.validated_data['product']
-#         quantity = serializer.validated_data['quantity']
-#         notes = serializer.validated_data.get('notes', '')
-
-#         # 🔥 CORE CHANGE: use service layer instead of direct save
-#         result = StoreStockService.transfer_stock(
-#             product=product,
-#             from_store=from_store,
-#             to_store=to_store,
-#             quantity=quantity,
-#             user=user,
-#             reference=f"TRANSFER-{timezone.now().timestamp()}",
-#             remarks=notes
-#         )
-
-#         # Save ONLY the "parent transfer record"
-#         # using OUT transaction as reference point
-#         serializer.save(
-#             performed_by=user,
-#             transfer_id=result["transfer_id"]
-#         )
-
-#     # -------------------------------------------------
-#     # SUMMARY (optimized slightly)
-#     # -------------------------------------------------
-#     @action(detail=False, methods=['get'])
-#     def summary(self, request):
-
-#         queryset = self.filter_queryset(self.get_queryset())
-
-#         summary = {
-#             'total_transfers': queryset.count(),
-#             'total_quantity': queryset.aggregate(
-#                 total=Sum('quantity')
-#             )['total'] or 0,
-#             'today': queryset.filter(
-#                 created_at__date=timezone.now().date()
-#             ).count(),
-#             'by_store': {},
-#         }
-
-#         stores = set()
-#         for t in queryset:
-#             stores.add(t.from_store)
-#             stores.add(t.to_store)
-
-#         for store in stores:
-#             outgoing = queryset.filter(from_store=store).aggregate(
-#                 total=Sum('quantity')
-#             )['total'] or 0
-
-#             incoming = queryset.filter(to_store=store).aggregate(
-#                 total=Sum('quantity')
-#             )['total'] or 0
-
-#             summary['by_store'][store.name] = {
-#                 'outgoing': outgoing,
-#                 'incoming': incoming,
-#                 'net': incoming - outgoing
-#             }
-
-#         return Response(summary)
-
-#     # -------------------------------------------------
-#     # RECENT (unchanged)
-#     # -------------------------------------------------
-#     @action(detail=False, methods=['get'])
-#     def recent(self, request):
-
-#         recent_date = timezone.now() - timezone.timedelta(days=7)
-
-#         recent_transfers = self.get_queryset().filter(
-#             created_at__gte=recent_date
-#         )[:10]
-
-#         serializer = self.get_serializer(recent_transfers, many=True)
-#         return Response(serializer.data)
-
-from django.db import transaction
-from django.db.models import Q, Sum
-from django.utils import timezone
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-
-from rest_framework import viewsets, filters, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-
-from django_filters.rest_framework import DjangoFilterBackend
-
-# from inventory.models import StockTransfer
-from .serializers import (
-    StockTransferSerializer,
-    StockTransferCreateSerializer
-)
-# from inventory.services import StoreStockService
 
 
 @method_decorator(csrf_exempt, name='dispatch')
