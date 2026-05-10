@@ -203,54 +203,211 @@ from django.views.decorators.csrf import csrf_protect
 
 #     return redirect("dashboard")
 
+# @csrf_protect
+# def login_view(request):
+#     if request.user.is_authenticated:
+#         # Check if user already has a store selected
+#         if request.session.get("store_id"):
+#             return redirect("dashboard")
+        
+#         # If logged in but no store selected, check their stores
+#         user_stores = request.user.stores.all()
+#         if user_stores.exists():
+#             if user_stores.count() == 1:
+#                 # Auto-select single store
+#                 store = user_stores.first()
+#                 request.session["store_id"] = store.id
+#                 request.session["store_type"] = store.store_type
+#                 return redirect("dashboard")
+#             else:
+#                 # Multiple stores - show modal
+#                 return render(request, "auth/login.html", {
+#                     "form": LoginForm(),
+#                     "stores": user_stores
+#                 })
+#         else:
+#             messages.error(request, "No store assigned.")
+#             return redirect("logout")
+
+#     form = LoginForm(request.POST or None)
+
+#     if request.method == "POST" and form.is_valid():
+#         unique_id = form.cleaned_data["unique_id"]
+#         password = form.cleaned_data["password"]
+
+#         user = authenticate(request, unique_id=unique_id, password=password)
+
+#         if user is None:
+#             messages.error(request, "Invalid credentials.")
+#             return render(request, "auth/login.html", {
+#                 "form": form,
+#                 "stores": None
+#             })
+
+#         login(request, user)
+
+#         # session setup
+#         request.session["role"] = user.role
+#         request.session.set_expiry(60 * 60 * 4)
+
+#         # 🔥 GET ALL STORES (retail + warehouse)
+#         user_stores = user.stores.all()
+
+#         print("\n[LOGIN DEBUG] User:", user)
+#         print("[LOGIN DEBUG] Total stores:", user_stores.count())
+
+#         for s in user_stores:
+#             print(f"[STORE] {s.name} | {s.store_type}")
+
+#         # ❌ No stores
+#         if not user_stores.exists():
+#             messages.error(request, "No store assigned.")
+#             return redirect("login")
+
+#         # ✅ One store → auto login
+#         if user_stores.count() == 1:
+#             store = user_stores.first()
+#             request.session["store_id"] = store.id
+#             request.session["store_type"] = store.store_type
+#             return redirect("dashboard")
+
+#         # 🔥 Multiple stores → show modal (NOT redirect) - THIS IS THE KEY FIX
+#         return render(request, "auth/login.html", {
+#             "form": LoginForm(),  # Reset form
+#             "stores": user_stores  # 👈 modal will show here
+#         })
+
+#     return render(request, "auth/login.html", {
+#         "form": form,
+#         "stores": None
+#     }) 
+
+
+# @login_required
+# def set_store(request):
+#     if request.method == "POST":
+#         store_id = request.POST.get("store_id")
+        
+#         print("Selected store:", store_id)
+        
+#         # only allow user's stores
+#         store = request.user.stores.filter(id=store_id).first()
+        
+#         if not store:
+#             messages.error(request, "Invalid store selected.")
+#             return redirect("dashboard")
+        
+#         # save session
+#         request.session["store_id"] = str(store.id)
+#         request.session["store_name"] = store.name
+#         request.session["store_type"] = store.store_type
+        
+#         print("Current store:", store.name)
+        
+#         messages.success(request, f"Welcome to {store.name}!")
+        
+#         # IMPORTANT: Redirect to dashboard after store selection
+#         # return redirect("dashboard")
+#         return redirect(request.META.get("HTTP_REFERER", "dashboard"))
+        
+    
+#     return redirect("dashboard")
+
+from django.contrib import messages
+from django.contrib.auth import authenticate, login
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import redirect, render
+from django.views.decorators.csrf import csrf_protect
+
+
+def apply_store_session(request, store):
+    """
+    Apply store session consistently for BOTH:
+    - auto store selection
+    - manual store selection
+    """
+
+    request.session["store_id"] = store.id
+    request.session["store_name"] = store.name
+    request.session["store_type"] = store.store_type
+
+    # force save
+    request.session.modified = True
+    request.session.save()
+
+    print("\n[STORE SESSION APPLIED]")
+    print("Store ID:", request.session.get("store_id"))
+    print("Store Name:", request.session.get("store_name"))
+    print("Store Type:", request.session.get("store_type"))
+
+
 @csrf_protect
 def login_view(request):
+
+    # -----------------------------------
+    # ALREADY LOGGED IN
+    # -----------------------------------
     if request.user.is_authenticated:
-        # Check if user already has a store selected
+
+        # store already selected
         if request.session.get("store_id"):
             return redirect("dashboard")
-        
-        # If logged in but no store selected, check their stores
+
         user_stores = request.user.stores.all()
-        if user_stores.exists():
-            if user_stores.count() == 1:
-                # Auto-select single store
-                store = user_stores.first()
-                request.session["store_id"] = store.id
-                request.session["store_type"] = store.store_type
-                return redirect("dashboard")
-            else:
-                # Multiple stores - show modal
-                return render(request, "auth/login.html", {
-                    "form": LoginForm(),
-                    "stores": user_stores
-                })
-        else:
+
+        # no stores
+        if not user_stores.exists():
             messages.error(request, "No store assigned.")
             return redirect("logout")
 
+        # auto select single store
+        if user_stores.count() == 1:
+
+            store = user_stores.first()
+
+            # ✅ USE SAME SESSION LOGIC
+            apply_store_session(request, store)
+
+            return redirect("dashboard")
+
+        # multiple stores
+        return render(request, "auth/login.html", {
+            "form": LoginForm(),
+            "stores": user_stores
+        })
+
+    # -----------------------------------
+    # LOGIN FORM
+    # -----------------------------------
     form = LoginForm(request.POST or None)
 
     if request.method == "POST" and form.is_valid():
+
         unique_id = form.cleaned_data["unique_id"]
         password = form.cleaned_data["password"]
 
-        user = authenticate(request, unique_id=unique_id, password=password)
+        user = authenticate(
+            request,
+            unique_id=unique_id,
+            password=password
+        )
 
+        # invalid login
         if user is None:
             messages.error(request, "Invalid credentials.")
+
             return render(request, "auth/login.html", {
                 "form": form,
                 "stores": None
             })
 
+        # login user
         login(request, user)
 
         # session setup
         request.session["role"] = user.role
         request.session.set_expiry(60 * 60 * 4)
 
-        # 🔥 GET ALL STORES (retail + warehouse)
         user_stores = user.stores.all()
 
         print("\n[LOGIN DEBUG] User:", user)
@@ -259,58 +416,56 @@ def login_view(request):
         for s in user_stores:
             print(f"[STORE] {s.name} | {s.store_type}")
 
-        # ❌ No stores
+        # no stores
         if not user_stores.exists():
             messages.error(request, "No store assigned.")
             return redirect("login")
 
-        # ✅ One store → auto login
+        # auto select single store
         if user_stores.count() == 1:
+
             store = user_stores.first()
-            request.session["store_id"] = store.id
-            request.session["store_type"] = store.store_type
+
+            # ✅ USE SAME SESSION LOGIC
+            apply_store_session(request, store)
+
             return redirect("dashboard")
 
-        # 🔥 Multiple stores → show modal (NOT redirect) - THIS IS THE KEY FIX
+        # multiple stores → show modal
         return render(request, "auth/login.html", {
-            "form": LoginForm(),  # Reset form
-            "stores": user_stores  # 👈 modal will show here
+            "form": LoginForm(),
+            "stores": user_stores
         })
 
     return render(request, "auth/login.html", {
         "form": form,
         "stores": None
-    }) 
+    })
 
 
 @login_required
 def set_store(request):
+
     if request.method == "POST":
+
         store_id = request.POST.get("store_id")
-        
+
         print("Selected store:", store_id)
-        
+
         # only allow user's stores
         store = request.user.stores.filter(id=store_id).first()
-        
+
         if not store:
             messages.error(request, "Invalid store selected.")
             return redirect("dashboard")
-        
-        # save session
-        request.session["store_id"] = str(store.id)
-        request.session["store_name"] = store.name
-        request.session["store_type"] = store.store_type
-        
-        print("Current store:", store.name)
-        
+
+        # ✅ USE SAME SESSION LOGIC
+        apply_store_session(request, store)
+
         messages.success(request, f"Welcome to {store.name}!")
-        
-        # IMPORTANT: Redirect to dashboard after store selection
-        # return redirect("dashboard")
+
         return redirect(request.META.get("HTTP_REFERER", "dashboard"))
-        
-    
+
     return redirect("dashboard")
 
 
