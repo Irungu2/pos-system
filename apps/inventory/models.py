@@ -91,11 +91,20 @@ class Product(models.Model):
         result = StoreStock.objects.filter(product=self).aggregate(total=Sum('quantity'))
         return result['total'] or 0
 
+    # @property
+    # def available_stock(self):
+    #     retail_stores = Store.objects.filter(store_type=Store.RETAIL)
+    #     result = StoreStock.objects.filter(product=self, store__in=retail_stores).aggregate(total=Sum('quantity'))
+    #     return result['total'] or 0
+
     @property
-    def available_stock(self):
-        retail_stores = Store.objects.filter(store_type=Store.RETAIL)
-        result = StoreStock.objects.filter(product=self, store__in=retail_stores).aggregate(total=Sum('quantity'))
-        return result['total'] or 0
+    def available_stock(self, store=None):
+        qs = StoreStock.objects.filter(product=self)
+
+        if store:
+            qs = qs.filter(store=store)
+
+        return qs.aggregate(total=Sum('quantity'))['total'] or 0
 
     @property
     def warehouse_stock(self):
@@ -262,7 +271,7 @@ class StoreStock(models.Model):
 
     def __str__(self):
         return f"{self.product.name} - {self.store.name} ({self.quantity})"
-
+ 
 
 class StockTransaction(models.Model):
     IN = "IN"
@@ -288,6 +297,8 @@ class StockTransaction(models.Model):
         related_name="incoming_transactions"
     )
     performed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    previous_quantity = models.IntegerField(null=True, blank=True)
+    new_quantity = models.IntegerField(null=True, blank=True)
     reference = models.CharField(max_length=100, blank=True)
     timestamp = models.DateTimeField(default=timezone.now)
     remarks = models.TextField(blank=True)
@@ -304,19 +315,109 @@ from django.db import models, transaction
 # from django.db.models import F
 # from django.utils import timezone
 
+# class StockTransfer(models.Model):
+#     product = models.ForeignKey("inventory.Product", on_delete=models.CASCADE)
+#     from_store = models.ForeignKey(
+#         "inventory.Store",
+#         related_name="outgoing_transfers",
+#         on_delete=models.CASCADE
+#     )
+#     to_store = models.ForeignKey(
+#         "inventory.Store",
+#         related_name="incoming_transfers",
+#         on_delete=models.CASCADE
+#     )
+#     quantity = models.PositiveIntegerField()
+#     performed_by = models.ForeignKey(
+#         "account.User",
+#         on_delete=models.SET_NULL,
+#         null=True,
+#         blank=True,
+#         related_name="created_transfers"
+#     )
+#     status = models.CharField(
+#         max_length=20,
+#         default='completed',
+#         editable=False
+#     )
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     notes = models.TextField(blank=True)
+#     transfer_code = models.CharField(max_length=10, unique=True, editable=False)
+#     class Meta:
+#         ordering = ['-created_at']
+
+#     def __str__(self):
+#         return f"{self.product.name}: {self.quantity} units {self.from_store} → {self.to_store}"
+
+#     @transaction.atomic
+#     def save(self, *args, **kwargs):
+#         is_new = not self.pk
+        
+#         if is_new:
+#             # VALIDATE STOCK AVAILABILITY
+#             from_stock = StoreStock.objects.select_for_update().filter(
+#                 store=self.from_store, 
+#                 product=self.product
+#             ).first()
+            
+#             if not from_stock or from_stock.quantity < self.quantity:
+#                 raise ValueError(
+#                     f"Insufficient stock in {self.from_store.name}. "
+#                     f"Available: {from_stock.quantity if from_stock else 0}"
+#                 )
+            
+#             # UPDATE SOURCE STOCK
+#             from_stock.quantity = F('quantity') - self.quantity
+#             from_stock.save(update_fields=['quantity'])
+            
+#             # UPDATE OR CREATE DESTINATION STOCK
+#             to_stock, created = StoreStock.objects.select_for_update().get_or_create(
+#                 store=self.to_store,
+#                 product=self.product,
+#                 defaults={'quantity': self.quantity}
+#             )
+            
+#             if not created:
+#                 to_stock.quantity = F('quantity') + self.quantity
+#                 to_stock.save(update_fields=['quantity'])
+            
+#             # CREATE STOCK TRANSACTIONS
+#             StockTransaction.objects.create(
+#                 product=self.product,
+#                 store=self.from_store,
+#                 transaction_type=StockTransaction.TRANSFER_OUT,
+#                 quantity=self.quantity,
+#                 remarks=f"Transferred to {self.to_store.name}",
+#                 performed_by=self.performed_by,
+#                 reference=self
+#             )
+            
+#             StockTransaction.objects.create(
+#                 product=self.product,
+#                 store=self.to_store,
+#                 transaction_type=StockTransaction.TRANSFER_IN,
+#                 quantity=self.quantity,
+#                 remarks=f"Transferred from {self.from_store.name}",
+#                 performed_by=self.performed_by,
+#                 reference=self
+#             )
+        
+#         # Save the transfer record
+#         super().save(*args, **kwargs)
+        
+#         if is_new:
+#             # Refresh stock objects to get updated quantities
+#             from_stock.refresh_from_db()
+#             to_stock.refresh_from_db()
+
+
 class StockTransfer(models.Model):
     product = models.ForeignKey("inventory.Product", on_delete=models.CASCADE)
-    from_store = models.ForeignKey(
-        "inventory.Store",
-        related_name="outgoing_transfers",
-        on_delete=models.CASCADE
-    )
-    to_store = models.ForeignKey(
-        "inventory.Store",
-        related_name="incoming_transfers",
-        on_delete=models.CASCADE
-    )
+    from_store = models.ForeignKey("inventory.Store", related_name="outgoing_transfers", on_delete=models.CASCADE)
+    to_store = models.ForeignKey("inventory.Store", related_name="incoming_transfers", on_delete=models.CASCADE)
+
     quantity = models.PositiveIntegerField()
+
     performed_by = models.ForeignKey(
         "account.User",
         on_delete=models.SET_NULL,
@@ -329,6 +430,8 @@ class StockTransfer(models.Model):
         default='completed',
         editable=False
     )
+    transfer_code = models.CharField(max_length=11, unique=True, editable=False,null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     notes = models.TextField(blank=True)
 
@@ -336,68 +439,8 @@ class StockTransfer(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.product.name}: {self.quantity} units {self.from_store} → {self.to_store}"
+        return f"{self.transfer_code}"
 
-    @transaction.atomic
-    def save(self, *args, **kwargs):
-        is_new = not self.pk
-        
-        if is_new:
-            # VALIDATE STOCK AVAILABILITY
-            from_stock = StoreStock.objects.select_for_update().filter(
-                store=self.from_store, 
-                product=self.product
-            ).first()
-            
-            if not from_stock or from_stock.quantity < self.quantity:
-                raise ValueError(
-                    f"Insufficient stock in {self.from_store.name}. "
-                    f"Available: {from_stock.quantity if from_stock else 0}"
-                )
-            
-            # UPDATE SOURCE STOCK
-            from_stock.quantity = F('quantity') - self.quantity
-            from_stock.save(update_fields=['quantity'])
-            
-            # UPDATE OR CREATE DESTINATION STOCK
-            to_stock, created = StoreStock.objects.select_for_update().get_or_create(
-                store=self.to_store,
-                product=self.product,
-                defaults={'quantity': self.quantity}
-            )
-            
-            if not created:
-                to_stock.quantity = F('quantity') + self.quantity
-                to_stock.save(update_fields=['quantity'])
-            
-            # CREATE STOCK TRANSACTIONS
-            StockTransaction.objects.create(
-                product=self.product,
-                store=self.from_store,
-                transaction_type=StockTransaction.TRANSFER_OUT,
-                quantity=self.quantity,
-                remarks=f"Transferred to {self.to_store.name}",
-                performed_by=self.performed_by,
-                reference=self
-            )
-            
-            StockTransaction.objects.create(
-                product=self.product,
-                store=self.to_store,
-                transaction_type=StockTransaction.TRANSFER_IN,
-                quantity=self.quantity,
-                remarks=f"Transferred from {self.from_store.name}",
-                performed_by=self.performed_by,
-                reference=self
-            )
-        
-        # Save the transfer record
-        super().save(*args, **kwargs)
-        
-        if is_new:
-            # Refresh stock objects to get updated quantities
-            from_stock.refresh_from_db()
-            to_stock.refresh_from_db()
 
 
 # bulk 
@@ -405,6 +448,7 @@ class StockTransfer(models.Model):
 class BulkRestock(models.Model):
     store = models.ForeignKey("inventory.Store", on_delete=models.CASCADE, related_name="bulk_restocks")
     category = models.ForeignKey("inventory.Category", on_delete=models.SET_NULL, null=True, blank=True)
+    completed_by = models.ForeignKey("account.User",on_delete=models.SET_NULL,null=True,blank=True,related_name="created_bulk_restock")
     include_all = models.BooleanField(default=False)
     generated_at = models.DateTimeField(auto_now_add=True)
     completed = models.BooleanField(default=False)
@@ -421,36 +465,36 @@ class BulkRestock(models.Model):
     def items_count(self):
         return self.items.count()
     
-    @transaction.atomic
-    def process_restock(self):
-        """Process the restock - update all items with new quantities"""
-        for item in self.items.all():
-            # Update store stock
-            store_stock, created = StoreStock.objects.get_or_create(
-                store=self.store,
-                product=item.product,
-                defaults={'quantity': item.new_quantity}
-            )
+    # @transaction.atomic
+    # def process_restock(self):
+    #     """Process the restock - update all items with new quantities"""
+    #     for item in self.items.all():
+    #         # Update store stock
+    #         store_stock, created = StoreStock.objects.get_or_create(
+    #             store=self.store,
+    #             product=item.product,
+    #             defaults={'quantity': item.new_quantity}
+    #         )
             
-            if not created:
-                store_stock.quantity = item.new_quantity
-                store_stock.save()
+    #         if not created:
+    #             store_stock.quantity = item.new_quantity
+    #             store_stock.save()
             
-            # Create stock transaction
-            StockTransaction.objects.create(
-                product=item.product,
-                store=self.store,
-                transaction_type=StockTransaction.IN,
-                quantity=item.new_quantity - item.current_quantity,
-                remarks=f"Bulk restock from Excel",
-                performed_by=None,  # Can be set when processing
-                reference=f"BULK-{self.id}"
-            )
+    #         # Create stock transaction
+    #         StockTransaction.objects.create(
+    #             product=item.product,
+    #             store=self.store,
+    #             transaction_type=StockTransaction.IN,
+    #             quantity=item.new_quantity - item.current_quantity,
+    #             remarks=f"Bulk restock from Excel",
+    #             performed_by=None,  # Can be set when processing
+    #             reference=f"BULK-{self.id}"
+    #         )
         
-        self.completed = True
-        self.completed_at = timezone.now()
-        self.save()
-        return True
+    #     self.completed = True
+    #     self.completed_at = timezone.now()
+    #     self.save()
+    #     return True
 
 
 class BulkRestockItem(models.Model):

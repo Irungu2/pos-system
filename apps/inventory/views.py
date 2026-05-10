@@ -8,10 +8,10 @@ import logging
 # =========================
 # Third-Party Imports
 # =========================
-# import pandas as pd
+import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill
-
+from io import BytesIO
 import barcode
 from barcode.writer import ImageWriter
 
@@ -40,7 +40,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
-
+from .services import StoreStockService,RestockDebugService
 # =========================
 # Django Filters
 # =========================
@@ -122,610 +122,6 @@ class CategoryViewSet(viewsets.ModelViewSet):
             )
         instance.delete()
 
-
-
-# @method_decorator(csrf_exempt, name='dispatch')
-# class ProductViewSet2(viewsets.ModelViewSet):
-#     permission_classes = [IsAuthenticated]
-#     queryset = Product.objects.all().select_related('category')
-#     serializer_class = ProductSerializer
-#     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-#     filterset_fields = ['category', 'is_active']
-#     search_fields = ['name', 'sku', 'barcode', 'description']
-#     ordering_fields = ['name', 'selling_price', 'created_at']
-#     ordering = ['name']
-
-#     def get_queryset(self):
-#         print("\n[POS API] get_queryset called")
-#         queryset = super().get_queryset()
-#         stock_status = self.request.query_params.get('stock_status')
-#         if stock_status:
-#             if stock_status == 'out_of_stock':
-#                 queryset = queryset.filter(available_stock=0)
-#             elif stock_status == 'low_stock':
-#                 queryset = queryset.filter(available_stock__lte=F('reorder_level'), available_stock__gt=0)
-#             elif stock_status == 'in_stock':
-#                 queryset = queryset.filter(available_stock__gt=F('reorder_level'))
-#         print("[POS API] queryset count after stock filter:", queryset.count())
-#         return queryset
-
-#     @action(detail=False, methods=['get'])
-#     def low_stock(self, request):
-#         print("\n[POS API] low_stock called")
-#         low_stock_products = self.get_queryset().filter(
-#             available_stock__lte=F('reorder_level'),
-#             is_active=True
-#         )
-#         print("[POS API] Low stock count:", low_stock_products.count())
-#         serializer = self.get_serializer(low_stock_products, many=True)
-#         return Response(serializer.data)
-
-#     @action(detail=False, methods=['get'])
-#     def search_products(self, request):
-#         print("\n[POS API] search_products called")
-#         search_term = request.GET.get('q', '')
-#         category_id = request.GET.get('category')
-#         print("[POS API] Search term:", search_term)
-#         print("[POS API] Category filter:", category_id)
-
-#         retail_store = Store.objects.filter(store_type=Store.RETAIL).first()
-#         if not retail_store:
-#             print("[POS API] ERROR: No retail store found")
-#             return Response([], status=200)
-
-#         queryset = Product.objects.filter(
-#             is_active=True,
-#             storestock__store=retail_store,
-#             storestock__quantity__gt=0
-#         ).select_related('category').annotate(
-#             available_quantity=F('storestock__quantity')
-#         )
-
-#         if search_term:
-#             queryset = queryset.filter(
-#                 Q(name__icontains=search_term) |
-#                 Q(sku__icontains=search_term) |
-#                 Q(barcode__icontains=search_term)
-#             )
-
-#         if category_id:
-#             queryset = queryset.filter(category_id=category_id)
-
-#         print("[POS API] Final queryset count:", queryset.count())
-
-#         queryset = queryset[:50]
-#         serializer = POSProductSerializer(queryset, many=True)
-#         print("[POS API] Serialized count:", len(serializer.data))
-#         return Response(serializer.data)
-
-#     @action(detail=True, methods=['post'])
-#     def update_store_stock(self, request, pk=None):
-#         print("\n[POS API] update_store_stock called")
-#         product = self.get_object()
-#         store_id = request.data.get('store_id')
-#         quantity = request.data.get('quantity')
-#         action_type = request.data.get('action')
-
-#         print("[POS API] store_id:", store_id, "quantity:", quantity, "action:", action_type)
-
-#         if not store_id or not isinstance(quantity, int):
-#             return Response({'error': 'Store ID and valid quantity are required'}, status=400)
-
-#         try:
-#             store = Store.objects.get(id=store_id)
-#             store_stock, _ = StoreStock.objects.get_or_create(store=store, product=product, defaults={'quantity': 0})
-
-#             if action_type == 'add':
-#                 store_stock.quantity += quantity
-#             elif action_type == 'set':
-#                 store_stock.quantity = quantity
-#             else:
-#                 return Response({'error': 'Action must be "add" or "set"'}, status=400)
-
-#             store_stock.save()
-#             StockTransaction.objects.create(
-#                 product=product,
-#                 store=store,
-#                 transaction_type=StockTransaction.IN if quantity > 0 else StockTransaction.OUT,
-#                 quantity=abs(quantity),
-#                 performed_by=request.user,
-#                 remarks=f"Manual stock adjustment: {action_type}"
-#             )
-#             print("[POS API] Stock updated:", store_stock.quantity)
-#             serializer = self.get_serializer(product)
-#             return Response(serializer.data)
-
-#         except Store.DoesNotExist:
-#             return Response({'error': 'Store not found'}, status=404)
-#         except Exception as e:
-#             print("[POS API] EXCEPTION:", str(e))
-#             return Response({'error': str(e)}, status=400)
-
-
-# @method_decorator(csrf_exempt, name='dispatch')
-# class ProductViewSet(viewsets.ModelViewSet):
-#     queryset = Product.objects.all().select_related("category")
-#     serializer_class = ProductSerializer
-
-#     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-#     filterset_fields = ["category", "is_active"]
-#     search_fields = ["name", "sku", "barcode", "description"]
-#     ordering_fields = ["name", "selling_price", "created_at"]
-#     ordering = ["name"]
-
-
-#     def get_queryset(self):
-#         user = self.request.user
-
-#         qs = Product.objects.all().select_related("category")
-
-#         # 👑 ADMIN / MANAGER → see everything
-#         if user.is_superuser or user.role in ["admin", "manager"]:
-#             return qs.distinct()
-
-#         # 👤 NORMAL USER → only retail with stock
-#         return qs.filter(
-#             storestock__store__store_type=Store.RETAIL,
-#             storestock__quantity__gt=0
-#         ).distinct()
-
-
-#     @action(detail=False, methods=["get"], url_path="low_stock")
-#     # def low_stock(self, request):
-#     #     print("\n[PRODUCT API] low_stock called")
-#     #     low_stock_items = self.queryset.filter(stock__lt=10)
-#     #     print("[PRODUCT API] Low stock count:", low_stock_items.count())
-#     #     serializer = self.get_serializer(low_stock_items, many=True)
-#     #     return Response(serializer.data)
-#     def low_stock(self, request):
-#         store = get_store(request)
-
-#         qs = Product.objects.filter(
-#             storestock__store=store,
-#             storestock__quantity__lte=F("reorder_level")
-#         ).distinct()
-
-#         serializer = self.get_serializer(qs, many=True)
-#         return Response(serializer.data)
-
-
-#     @action(detail=False, methods=["get"], url_path="search_products")
-#     def search_products(self, request):
-#         print("\n[PRODUCT API] search_products called")
-#         query = request.query_params.get("q", "")
-#         category = request.query_params.get("category")
-#         print("[PRODUCT API] Search query:", query)
-#         print("[PRODUCT API] Category filter:", category)
-
-#         qs = self.queryset
-
-#         # Filter by query if provided
-#         if query:
-#             qs = qs.filter(
-#                 name__icontains=query
-#             )
-
-#         # Filter by category if provided
-#         if category:
-#             qs = qs.filter(category_id=category)
-
-#         print("[PRODUCT API] Result count:", qs.count())
-
-#         serializer = self.get_serializer(qs[:50], many=True)
-#         print("[PRODUCT API] Serialized count:", len(serializer.data))
-#         return Response(serializer.data)
-
-
-#     @action(detail=True, methods=["post"], url_path="update_store_stock")
-#     def update_store_stock(self, request, pk=None):
-#         product = self.get_object()
-
-#         store_id = request.data.get("store_id")
-#         action = request.data.get("action", "set")
-
-#         try:
-#             quantity = int(request.data.get("quantity"))
-#         except (TypeError, ValueError):
-#             return Response({"error": "Invalid quantity"}, status=400)
-
-#         if not store_id:
-#             return Response({"error": "store_id is required"}, status=400)
-
-#         # get or create stock row
-#         store_stock, _ = StoreStock.objects.get_or_create(
-#             product=product,
-#             store_id=store_id,
-#             defaults={"quantity": 0}
-#         )
-
-#         if action == "set":
-#             store_stock.quantity = quantity
-#             store_stock.save()
-
-#         elif action == "add":
-#             StoreStock.objects.filter(id=store_stock.id).update(
-#                 quantity=F("quantity") + quantity
-#             )
-
-#         elif action == "remove":
-#             with transaction.atomic():
-#                 stock = StoreStock.objects.select_for_update().get(id=store_stock.id)
-
-#                 if stock.quantity < quantity:
-#                     return Response({"error": "Insufficient stock"}, status=400)
-
-#                 stock.quantity -= quantity
-#                 stock.save()
-
-#         else:
-#             return Response({"error": "Invalid action"}, status=400)
-
-#         store_stock.refresh_from_db()
-
-#         return Response({
-#             "message": "Stock updated successfully",
-#             "store_id": store_id,
-#             "product_id": product.id,
-#             "quantity": store_stock.quantity
-#         })
-
-#     @action(detail=True, methods=["post"], url_path="toggle_active")
-#     def toggle_active(self, request, pk=None):
-#         print("\n[PRODUCT API] toggle_active called")
-#         product = self.get_object()
-#         old_status = product.is_active
-#         product.is_active = not old_status
-#         product.save()
-#         print("[PRODUCT API] is_active:", old_status, "→", product.is_active)
-#         return Response({"is_active": product.is_active})
-
-#     @action(detail=True, methods=["post"], url_path="restock")
-#     def restock(self, request, pk=None):
-#         print("\n[PRODUCT API] restock called")
-#         product = self.get_object()
-#         try:
-#             qty = int(request.data.get("qty", 0))
-#         except ValueError:
-#             return Response({"error": "Invalid quantity"}, status=400)
-
-#         if qty <= 0:
-#             return Response({"error": "Invalid quantity"}, status=400)
-
-#         old_stock = product.stock
-#         product.stock += qty
-#         product.save()
-#         print("[PRODUCT API] Stock updated:", old_stock, "→", product.stock)
-
-#         return Response({"message": "Product restocked", "stock": product.stock})
-
-
-# from django.core.exceptions import PermissionDenied
-# from django.db.models import F
-# from django.db import transaction
-# from django.utils.decorators import method_decorator
-# from django.views.decorators.csrf import csrf_exempt
-# from rest_framework import viewsets, filters
-# from rest_framework.decorators import action
-# from rest_framework.response import Response
-# from django_filters.rest_framework import DjangoFilterBackend
-# from .models import Product, StoreStock
-# from .serializers import ProductSerializer
-# from apps.inventory.models import Store
-# from .store_utils import get_current_store  # Import your helper
-
-# @method_decorator(csrf_exempt, name='dispatch')
-# class ProductViewSet(viewsets.ModelViewSet):
-#     queryset = Product.objects.all().select_related("category")
-#     serializer_class = ProductSerializer
-
-#     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-#     filterset_fields = ["category", "is_active"]
-#     search_fields = ["name", "sku", "barcode", "description"]
-#     ordering_fields = ["name", "selling_price", "created_at"]
-#     ordering = ["name"]
-
-#     def get_queryset(self):
-#         user = self.request.user
-
-#         qs = Product.objects.all().select_related("category")
-
-#         # 👑 ADMIN / MANAGER → see everything
-#         if user.is_superuser or user.role in ["admin", "manager"]:
-#             return qs.distinct()
-
-#         # 👤 NORMAL USER → only products in their store with stock
-#         try:
-#             store = get_current_store(self.request)
-#             if store:
-#                 return qs.filter(
-#                     storestock__store=store,
-#                     storestock__quantity__gt=0
-#                 ).distinct()
-#         except PermissionDenied:
-#             pass
-        
-#         # If no store selected or permission denied, return empty
-#         return qs.none()
-
-#     @action(detail=False, methods=["get"], url_path="low_stock")
-#     def low_stock(self, request):
-#         try:
-#             store = get_current_store(request)
-#             if not store:
-#                 return Response({"error": "No store selected"}, status=400)
-            
-#             qs = Product.objects.filter(
-#                 storestock__store=store,
-#                 storestock__quantity__lte=F("reorder_level")
-#             ).distinct()
-
-#             serializer = self.get_serializer(qs, many=True)
-#             return Response(serializer.data)
-            
-#         except PermissionDenied as e:
-#             return Response({"error": str(e)}, status=403)
-
-#     # @action(detail=False, methods=["get"], url_path="search_products")
-#     # def search_products(self, request):
-#     #     print("\n[PRODUCT API] search_products called")
-#     #     query = request.query_params.get("q", "")
-#     #     category = request.query_params.get("category")
-#     #     print("[PRODUCT API] Search query:", query)
-#     #     print("[PRODUCT API] Category filter:", category)
-
-#     #     # Get the base queryset based on user role
-#     #     user = request.user
-#     #     qs = Product.objects.all().select_related("category")
-        
-#     #     # Apply store filter for non-admin users
-#     #     if not (user.is_superuser or user.role in ["admin", "manager"]):
-#     #         try:
-#     #             store = get_current_store(request)
-#     #             if store:
-#     #                 qs = qs.filter(storestock__store=store).distinct()
-#     #             else:
-#     #                 return Response({"error": "No store selected"}, status=400)
-#     #         except PermissionDenied as e:
-#     #             return Response({"error": str(e)}, status=403)
-
-#     #     # Filter by query if provided
-#     #     if query:
-#     #         qs = qs.filter(name__icontains=query)
-
-#     #     # Filter by category if provided
-#     #     if category:
-#     #         qs = qs.filter(category_id=category)
-
-#     #     print("[PRODUCT API] Result count:", qs.count())
-
-#     #     serializer = self.get_serializer(qs[:50], many=True)
-#     #     print("[PRODUCT API] Serialized count:", len(serializer.data))
-#     #     return Response(serializer.data)
-
-
-#     @action(detail=False, methods=["get"], url_path="search_products")
-#     def search_products(self, request):
-#         print("\n" + "="*50)
-#         print("[PRODUCT API] search_products called")
-#         print("="*50)
-        
-#         query = request.query_params.get("q", "")
-#         category = request.query_params.get("category")
-#         print(f"[PRODUCT API] Search query: '{query}'")
-#         print(f"[PRODUCT API] Category filter: '{category}'")
-#         print(f"[PRODUCT API] User: {request.user.display_name} (Role: {request.user.role})")
-        
-#         # Get the base queryset based on user role
-#         user = request.user
-#         qs = Product.objects.all().select_related("category")
-        
-#         print(f"\n[STEP 1] Initial queryset count: {qs.count()}")
-        
-#         # Apply store filter for non-admin users
-#         if not (user.is_superuser or user.role in ["admin", "manager"]):
-#             print(f"\n[STEP 2] User is NOT admin - applying store filter")
-#             try:
-#                 store = get_current_store(request)
-#                 if store:
-#                     print(f"[STEP 2a] Current store: {store.name} (ID: {store.id})")
-#                     print(f"[STEP 2b] Filtering products by store_id={store.id}")
-                    
-#                     # Show the filter being applied
-#                     qs = qs.filter(storestock__store=store).distinct()
-                    
-#                     # Print the SQL query
-#                     print(f"\n[SQL QUERY] {str(qs.query)}")
-#                     print(f"\n[STEP 2c] After store filter count: {qs.count()}")
-                    
-#                     # Print first 5 products after store filter
-#                     print(f"\n[PRODUCTS IN STORE {store.name}]:")
-#                     for idx, p in enumerate(qs[:5], 1):
-#                         stock = StoreStock.objects.filter(store=store, product=p).first()
-#                         print(f"  {idx}. {p.name} (ID: {p.id}) - Stock in store: {stock.quantity if stock else 0}")
-#                 else:
-#                     print(f"[STEP 2a] No store selected! Returning error")
-#                     return Response({"error": "No store selected"}, status=400)
-#             except PermissionDenied as e:
-#                 print(f"[STEP 2 ERROR] Permission denied: {str(e)}")
-#                 return Response({"error": str(e)}, status=403)
-#         else:
-#             print(f"\n[STEP 2] User IS admin/superuser - NO store filter applied")
-#             print(f"[STEP 2a] Admin can see all products from all stores")
-#             print(f"[SQL QUERY] {str(qs.query)}")
-        
-#         # Filter by query if provided
-#         if query:
-#             print(f"\n[STEP 3] Applying search filter for: '{query}'")
-#             old_count = qs.count()
-#             qs = qs.filter(name__icontains=query)
-#             print(f"[STEP 3a] Products found with name containing '{query}': {qs.count()} (was {old_count})")
-            
-#             # Print matching products
-#             for idx, p in enumerate(qs[:5], 1):
-#                 print(f"  {idx}. {p.name} - Matches search")
-#         else:
-#             print(f"\n[STEP 3] No search query provided - skipping name filter")
-        
-#         # Filter by category if provided
-#         if category:
-#             print(f"\n[STEP 4] Applying category filter for ID: '{category}'")
-#             old_count = qs.count()
-#             qs = qs.filter(category_id=category)
-#             print(f"[STEP 4a] Products in category {category}: {qs.count()} (was {old_count})")
-            
-#             # Print matching products
-#             for idx, p in enumerate(qs[:5], 1):
-#                 print(f"  {idx}. {p.name} - Category ID: {p.category_id}")
-#         else:
-#             print(f"\n[STEP 4] No category filter provided - skipping category filter")
-        
-#         # Final results
-#         print(f"\n[STEP 5] FINAL RESULTS")
-#         print(f"[STEP 5a] Total products after all filters: {qs.count()}")
-        
-#         # Get the final queryset (limit to 50)
-#         final_qs = qs[:50]
-#         print(f"[STEP 5b] Returning first {len(final_qs)} products (limited to 50)")
-        
-#         # Print detailed results
-#         print(f"\n[FINAL PRODUCTS LIST]:")
-#         for idx, product in enumerate(final_qs, 1):
-#             # Get stock for current store
-#             try:
-#                 store = get_current_store(request)
-#                 if store and not (user.is_superuser or user.role in ["admin", "manager"]):
-#                     stock_item = StoreStock.objects.filter(store=store, product=product).first()
-#                     stock_qty = stock_item.quantity if stock_item else 0
-#                 else:
-#                     # For admin, show stock from any store
-#                     stock_qty = "All stores"
-#             except:
-#                 stock_qty = "Unknown"
-            
-#             print(f"  {idx}. ID:{product.id} | Name:{product.name} | Price:{product.selling_price} | Stock:{stock_qty}")
-        
-#         # Serialize and return
-#         serializer = self.get_serializer(final_qs, many=True)
-#         print(f"\n[STEP 6] Serialized {len(serializer.data)} products to JSON")
-#         print("="*50 + "\n")
-        
-#         return Response(serializer.data)
-
-
-#     @action(detail=True, methods=["post"], url_path="update_store_stock")
-#     def update_store_stock(self, request, pk=None):
-#         product = self.get_object()
-        
-#         # Get store from request or session
-#         store_id = request.data.get("store_id")
-        
-#         if not store_id:
-#             # Try to get from session if not provided
-#             try:
-#                 store = get_current_store(request)
-#                 if store:
-#                     store_id = store.id
-#                 else:
-#                     return Response({"error": "store_id is required or select a store"}, status=400)
-#             except PermissionDenied as e:
-#                 return Response({"error": str(e)}, status=403)
-
-#         action_type = request.data.get("action", "set")
-
-#         try:
-#             quantity = int(request.data.get("quantity"))
-#         except (TypeError, ValueError):
-#             return Response({"error": "Invalid quantity"}, status=400)
-
-#         # get or create stock row
-#         store_stock, created = StoreStock.objects.get_or_create(
-#             product=product,
-#             store_id=store_id,
-#             defaults={"quantity": 0}
-#         )
-
-#         if action_type == "set":
-#             store_stock.quantity = quantity
-#             store_stock.save()
-
-#         elif action_type == "add":
-#             StoreStock.objects.filter(id=store_stock.id).update(
-#                 quantity=F("quantity") + quantity
-#             )
-
-#         elif action_type == "remove":
-#             with transaction.atomic():
-#                 stock = StoreStock.objects.select_for_update().get(id=store_stock.id)
-
-#                 if stock.quantity < quantity:
-#                     return Response({"error": "Insufficient stock"}, status=400)
-
-#                 stock.quantity -= quantity
-#                 stock.save()
-
-#         else:
-#             return Response({"error": "Invalid action. Use 'set', 'add', or 'remove'"}, status=400)
-
-#         store_stock.refresh_from_db()
-
-#         return Response({
-#             "message": "Stock updated successfully",
-#             "store_id": store_id,
-#             "product_id": product.id,
-#             "quantity": store_stock.quantity
-#         })
-
-#     @action(detail=True, methods=["post"], url_path="toggle_active")
-#     def toggle_active(self, request, pk=None):
-#         print("\n[PRODUCT API] toggle_active called")
-#         product = self.get_object()
-#         old_status = product.is_active
-#         product.is_active = not old_status
-#         product.save()
-#         print("[PRODUCT API] is_active:", old_status, "→", product.is_active)
-#         return Response({"is_active": product.is_active})
-
-#     @action(detail=True, methods=["post"], url_path="restock")
-#     def restock(self, request, pk=None):
-#         print("\n[PRODUCT API] restock called")
-#         product = self.get_object()
-        
-#         try:
-#             qty = int(request.data.get("qty", 0))
-#         except ValueError:
-#             return Response({"error": "Invalid quantity"}, status=400)
-
-#         if qty <= 0:
-#             return Response({"error": "Quantity must be greater than 0"}, status=400)
-
-#         # Get the store
-#         try:
-#             store = get_current_store(request)
-#             if not store:
-#                 return Response({"error": "No store selected"}, status=400)
-#         except PermissionDenied as e:
-#             return Response({"error": str(e)}, status=403)
-        
-#         # Update store stock, not global product stock
-#         store_stock, created = StoreStock.objects.get_or_create(
-#             product=product,
-#             store=store,
-#             defaults={"quantity": 0}
-#         )
-        
-#         old_stock = store_stock.quantity
-#         store_stock.quantity += qty
-#         store_stock.save()
-        
-#         print("[PRODUCT API] Stock updated:", old_stock, "→", store_stock.quantity)
-
-#         return Response({
-#             "message": "Product restocked successfully",
-#             "store_id": store.id,
-#             "product_id": product.id,
-#             "old_quantity": old_stock,
-#             "new_quantity": store_stock.quantity
-#         })
 
 
 
@@ -850,170 +246,6 @@ class ProductViewSet(viewsets.ModelViewSet):
             
         except PermissionDenied as e:
             return Response({"error": str(e)}, status=403)
-
-    # @action(detail=False, methods=["get"], url_path="search_products")
-    # def search_products(self, request):
-    #     print("\n" + "="*50)
-    #     print("[PRODUCT API] search_products called")
-    #     print("="*50)
-        
-    #     query = request.query_params.get("q", "")
-    #     category = request.query_params.get("category")
-    #     context = request.query_params.get('context', 'inventory')  # 'inventory' or 'pos'
-    #     store_mode = request.query_params.get('store_mode', '')
-        
-    #     print(f"[PRODUCT API] Search query: '{query}'")
-    #     print(f"[PRODUCT API] Category filter: '{category}'")
-    #     print(f"[PRODUCT API] Context: '{context}'")
-    #     print(f"[PRODUCT API] Store mode: '{store_mode}'")
-    #     print(f"[PRODUCT API] User: {request.user.display_name} (Role: {request.user.role})")
-        
-    #     # Get the base queryset based on user role
-    #     user = request.user
-    #     qs = Product.objects.all().select_related("category")
-    #     is_admin = user.is_superuser or user.role in ["admin", "manager"]
-        
-    #     print(f"\n[STEP 1] Initial queryset count: {qs.count()}")
-    #     print(f"[STEP 1a] Is Admin: {is_admin}")
-        
-    #     # Determine filtering strategy based on context and user role
-    #     force_store_filter = False
-        
-    #     # POS context always forces store filtering
-    #     if context == 'pos':
-    #         print(f"\n[STEP 2] POS CONTEXT - enforcing store filter")
-    #         force_store_filter = True
-    #     # Non-admin users always have store filter
-    #     elif not is_admin:
-    #         print(f"\n[STEP 2] NON-ADMIN USER - enforcing store filter")
-    #         force_store_filter = True
-    #     # Admin in inventory mode - NO store filter
-    #     else:
-    #         print(f"\n[STEP 2] ADMIN IN INVENTORY MODE - showing all products")
-    #         force_store_filter = False
-        
-    #     # Apply store filter if needed
-    #     if force_store_filter:
-    #         try:
-    #             store = get_current_store(request)
-    #             if store:
-    #                 print(f"[STEP 2a] Current store: {store.name} (ID: {store.id})")
-    #                 print(f"[STEP 2b] Filtering products by store_id={store.id}")
-                    
-    #                 # Apply store filter and ensure we only get products with stock > 0 for POS
-    #                 if context == 'pos':
-    #                     qs = qs.filter(
-    #                         storestock__store=store,
-    #                         storestock__quantity__gt=0
-    #                     ).distinct()
-    #                     print(f"[STEP 2c] POS mode - only products with stock > 0")
-    #                 else:
-    #                     qs = qs.filter(storestock__store=store).distinct()
-    #                     print(f"[STEP 2c] Store mode - all products in store (including zero stock)")
-                    
-    #                 print(f"[STEP 2d] After store filter count: {qs.count()}")
-                    
-    #                 # Print first 5 products after store filter
-    #                 print(f"\n[PRODUCTS IN STORE {store.name}]:")
-    #                 for idx, p in enumerate(qs[:5], 1):
-    #                     stock = StoreStock.objects.filter(store=store, product=p).first()
-    #                     stock_qty = stock.quantity if stock else 0
-    #                     print(f"  {idx}. {p.name} (ID: {p.id}) - Stock: {stock_qty}")
-    #             else:
-    #                 print(f"[STEP 2a] No store selected! Returning error")
-    #                 return Response(
-    #                     {"error": "No store selected. Please select a store first."}, 
-    #                     status=400
-    #                 )
-    #         except PermissionDenied as e:
-    #             print(f"[STEP 2 ERROR] Permission denied: {str(e)}")
-    #             return Response({"error": str(e)}, status=403)
-    #     else:
-    #         print(f"\n[STEP 2] ADMIN INVENTORY MODE - showing ALL products from all stores")
-    #         # For admin inventory view, also show products with zero stock across all stores
-    #         qs = qs.all()
-    #         print(f"[STEP 2a] Total products in system: {qs.count()}")
-        
-    #     # Filter by query if provided
-    #     if query:
-    #         print(f"\n[STEP 3] Applying search filter for: '{query}'")
-    #         old_count = qs.count()
-    #         qs = qs.filter(
-    #             Q(name__icontains=query) | 
-    #             Q(sku__icontains=query) | 
-    #             Q(barcode__icontains=query)
-    #         )
-    #         print(f"[STEP 3a] Products found matching '{query}': {qs.count()} (was {old_count})")
-            
-    #         # Print matching products
-    #         for idx, p in enumerate(qs[:5], 1):
-    #             print(f"  {idx}. {p.name} (SKU: {p.sku}) - Matches search")
-    #     else:
-    #         print(f"\n[STEP 3] No search query provided - skipping name filter")
-        
-    #     # Filter by category if provided
-    #     if category:
-    #         print(f"\n[STEP 4] Applying category filter for ID: '{category}'")
-    #         old_count = qs.count()
-    #         qs = qs.filter(category_id=category)
-    #         print(f"[STEP 4a] Products in category {category}: {qs.count()} (was {old_count})")
-            
-    #         # Print matching products
-    #         for idx, p in enumerate(qs[:5], 1):
-    #             print(f"  {idx}. {p.name} - Category ID: {p.category_id}")
-    #     else:
-    #         print(f"\n[STEP 4] No category filter provided - skipping category filter")
-        
-    #     # Final results
-    #     print(f"\n[STEP 5] FINAL RESULTS")
-    #     print(f"[STEP 5a] Total products after all filters: {qs.count()}")
-        
-    #     # Get the final queryset (limit to 50 for performance)
-    #     final_qs = qs[:50]
-    #     print(f"[STEP 5b] Returning first {len(final_qs)} products (limited to 50)")
-        
-    #     # Print detailed results with stock information
-    #     print(f"\n[FINAL PRODUCTS LIST]:")
-    #     current_store = None
-    #     if force_store_filter:
-    #         try:
-    #             current_store = get_current_store(request)
-    #         except:
-    #             pass
-                
-    #     for idx, product in enumerate(final_qs, 1):
-    #         if current_store:
-    #             # Show stock for current store
-    #             stock_item = StoreStock.objects.filter(store=current_store, product=product).first()
-    #             stock_qty = stock_item.quantity if stock_item else 0
-    #             print(f"  {idx}. ID:{product.id} | Name:{product.name} | Price:{product.selling_price} | Store Stock:{stock_qty}")
-    #         else:
-    #             # For admin inventory view, show stock across all stores
-    #             total_stock = StoreStock.objects.filter(product=product).aggregate(total=models.Sum('quantity'))['total'] or 0
-    #             store_count = StoreStock.objects.filter(product=product).count()
-    #             print(f"  {idx}. ID:{product.id} | Name:{product.name} | Price:{product.selling_price} | Total Stock:{total_stock} (in {store_count} stores)")
-        
-    #     # Serialize and return
-    #     serializer = self.get_serializer(final_qs, many=True)
-        
-    #     # Add context metadata to response
-    #     response_data = {
-    #         "context": context,
-    #         "store_filtered": force_store_filter,
-    #         "count": len(final_qs),
-    #         "results": serializer.data
-    #     }
-        
-    #     if current_store:
-    #         response_data["store"] = {
-    #             "id": current_store.id,
-    #             "name": current_store.name
-    #         }
-        
-    #     print(f"\n[STEP 6] Serialized {len(serializer.data)} products to JSON")
-    #     print("="*50 + "\n")
-        
-    #     return Response(response_data)
 
     @action(detail=False, methods=["get"], url_path="search_products")
     def search_products(self, request):
@@ -1213,68 +445,187 @@ class ProductViewSet(viewsets.ModelViewSet):
         except ValueError:
             return Response({"error": "Invalid quantity parameter"}, status=400)
 
+    # @action(detail=True, methods=["post"], url_path="update_store_stock")
+    # def update_store_stock(self, request, pk=None):
+    #     product = self.get_object()
+        
+    #     # Get store from request or session
+    #     store_id = request.data.get("store_id")
+        
+    #     if not store_id:
+    #         # Try to get from session if not provided
+    #         try:
+    #             store = get_current_store(request)
+    #             if store:
+    #                 store_id = store.id
+    #             else:
+    #                 return Response({"error": "store_id is required or select a store"}, status=400)
+    #         except PermissionDenied as e:
+    #             return Response({"error": str(e)}, status=403)
+
+    #     action_type = request.data.get("action", "set")
+
+    #     try:
+    #         quantity = int(request.data.get("quantity"))
+    #     except (TypeError, ValueError):
+    #         return Response({"error": "Invalid quantity"}, status=400)
+
+    #     # get or create stock row
+    #     store_stock, created = StoreStock.objects.get_or_create(
+    #         product=product,
+    #         store_id=store_id,
+    #         defaults={"quantity": 0}
+    #     )
+
+    #     if action_type == "set":
+    #         store_stock.quantity = quantity
+    #         store_stock.save()
+
+    #     elif action_type == "add":
+    #         StoreStock.objects.filter(id=store_stock.id).update(
+    #             quantity=F("quantity") + quantity
+    #         )
+
+    #     elif action_type == "remove":
+    #         with transaction.atomic():
+    #             stock = StoreStock.objects.select_for_update().get(id=store_stock.id)
+
+    #             if stock.quantity < quantity:
+    #                 return Response({"error": "Insufficient stock"}, status=400)
+
+    #             stock.quantity -= quantity
+    #             stock.save()
+
+    #     else:
+    #         return Response({"error": "Invalid action. Use 'set', 'add', or 'remove'"}, status=400)
+
+    #     store_stock.refresh_from_db()
+
+    #     return Response({
+    #         "message": "Stock updated successfully",
+    #         "store_id": store_id,
+    #         "product_id": product.id,
+    #         "quantity": store_stock.quantity
+    #     })
+
+
+
     @action(detail=True, methods=["post"], url_path="update_store_stock")
     def update_store_stock(self, request, pk=None):
         product = self.get_object()
-        
-        # Get store from request or session
+
         store_id = request.data.get("store_id")
-        
+
         if not store_id:
-            # Try to get from session if not provided
             try:
                 store = get_current_store(request)
+
                 if store:
                     store_id = store.id
                 else:
-                    return Response({"error": "store_id is required or select a store"}, status=400)
-            except PermissionDenied as e:
-                return Response({"error": str(e)}, status=403)
+                    return Response(
+                        {"error": "store_id is required or select a store"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
 
-        action_type = request.data.get("action", "set")
+            except PermissionDenied as e:
+                return Response(
+                    {"error": str(e)},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
         try:
             quantity = int(request.data.get("quantity"))
         except (TypeError, ValueError):
-            return Response({"error": "Invalid quantity"}, status=400)
-
-        # get or create stock row
-        store_stock, created = StoreStock.objects.get_or_create(
-            product=product,
-            store_id=store_id,
-            defaults={"quantity": 0}
-        )
-
-        if action_type == "set":
-            store_stock.quantity = quantity
-            store_stock.save()
-
-        elif action_type == "add":
-            StoreStock.objects.filter(id=store_stock.id).update(
-                quantity=F("quantity") + quantity
+            return Response(
+                {"error": "Invalid quantity"},
+                status=status.HTTP_400_BAD_REQUEST
             )
 
-        elif action_type == "remove":
-            with transaction.atomic():
-                stock = StoreStock.objects.select_for_update().get(id=store_stock.id)
+        action_type = request.data.get("action", "set")
 
-                if stock.quantity < quantity:
-                    return Response({"error": "Insufficient stock"}, status=400)
+        try:
+            store = Store.objects.get(id=store_id)
 
-                stock.quantity -= quantity
-                stock.save()
+            # if action_type == "set":
+            #     StoreStockService.set(
+            #         product=product,
+            #         store=store,
+            #         quantity=quantity
+            #     )
 
-        else:
-            return Response({"error": "Invalid action. Use 'set', 'add', or 'remove'"}, status=400)
+            # elif action_type == "add":
+            #     StoreStockService.add(
+            #         product=product,
+            #         store=store,
+            #         quantity=quantity,
+            #         user=request.user,
+            #         remarks="Manual stock addition"
+            #     )
 
-        store_stock.refresh_from_db()
+            # elif action_type == "subtract":
+            #     StoreStockService.subtract(
+            #         product=product,
+            #         store=store,
+            #         quantity=quantity,
+            #         user=request.user,
+            #         remarks="Manual stock removal"
+            #     )
+            if action_type == "set":
+                StoreStockService.adjust_stock(
+                    product=product,
+                    store=store,
+                    action="set",
+                    quantity=quantity,
+                    user=request.user,
+                    remarks="Manual stock set"
+                )
 
-        return Response({
-            "message": "Stock updated successfully",
-            "store_id": store_id,
-            "product_id": product.id,
-            "quantity": store_stock.quantity
-        })
+            elif action_type == "add":
+                StoreStockService.adjust_stock(
+                    product=product,
+                    store=store,
+                    action="add",
+                    quantity=quantity,
+                    user=request.user,
+                    remarks="Manual stock addition"
+                )
+
+            elif action_type == "subtract":
+                StoreStockService.adjust_stock(
+                    product=product,
+                    store=store,
+                    action="subtract",
+                    quantity=quantity,
+                    user=request.user,
+                    remarks="Manual stock removal"
+                )
+            else:
+                return Response(
+                    {"error": "Invalid action. Use 'set', 'add', or 'subtract'"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            current_quantity = StoreStockService.get_store_stock(product, store)
+
+            return Response({
+                "message": "Stock updated successfully",
+                "store_id": store.id,
+                "product_id": product.id,
+                "quantity": current_quantity
+            })
+
+        except Store.DoesNotExist:
+            return Response(
+                {"error": "Store not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        except ValidationError as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     @action(detail=True, methods=["post"], url_path="toggle_active")
     def toggle_active(self, request, pk=None):
@@ -1286,47 +637,6 @@ class ProductViewSet(viewsets.ModelViewSet):
         print("[PRODUCT API] is_active:", old_status, "→", product.is_active)
         return Response({"is_active": product.is_active})
 
-    @action(detail=True, methods=["post"], url_path="restock")
-    def restock(self, request, pk=None):
-        print("\n[PRODUCT API] restock called")
-        product = self.get_object()
-        
-        try:
-            qty = int(request.data.get("qty", 0))
-        except ValueError:
-            return Response({"error": "Invalid quantity"}, status=400)
-
-        if qty <= 0:
-            return Response({"error": "Quantity must be greater than 0"}, status=400)
-
-        # Get the store
-        try:
-            store = get_current_store(request)
-            if not store:
-                return Response({"error": "No store selected"}, status=400)
-        except PermissionDenied as e:
-            return Response({"error": str(e)}, status=403)
-        
-        # Update store stock, not global product stock
-        store_stock, created = StoreStock.objects.get_or_create(
-            product=product,
-            store=store,
-            defaults={"quantity": 0}
-        )
-        
-        old_stock = store_stock.quantity
-        store_stock.quantity += qty
-        store_stock.save()
-        
-        print("[PRODUCT API] Stock updated:", old_stock, "→", store_stock.quantity)
-
-        return Response({
-            "message": "Product restocked successfully",
-            "store_id": store.id,
-            "product_id": product.id,
-            "old_quantity": old_stock,
-            "new_quantity": store_stock.quantity
-        })
 
     @action(detail=False, methods=["get"], url_path="store_products_summary")
     def store_products_summary(self, request):
@@ -1598,49 +908,141 @@ class StoreViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(warehouses, many=True)
         return Response(serializer.data)
 
-# @method_decorator([login_required], name='dispatch')
-# @login_required(login_url='/account/login/')
+from .services import StoreStockService
+
+
 class StoreStockViewSet(viewsets.ModelViewSet):
+    """
+    Store stock management API (service-layer driven)
+    """
     permission_classes = [IsAuthenticated]
+
     queryset = StoreStock.objects.all().select_related('store', 'product')
     serializer_class = StoreStockSerializer
+
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['store', 'product']
     search_fields = ['product__name', 'product__sku', 'store__name']
 
-    @action(detail=False, methods=['get'])
-    def store_inventory(self, request):
-        """Get complete inventory for a specific store"""
-        store_id = request.query_params.get('store_id')
-        if not store_id:
+    def partial_update(self, request, *args, **kwargs):
+        """
+        Handles stock adjustment via service layer
+        JS calls: PATCH /store-stocks/{id}/
+        """
+        try:
+            stock = self.get_object()
+            
+            # Debug logging
+            print(f"Received PATCH request for stock {stock.id}")
+            print(f"Request data: {request.data}")
+            
+            action = request.data.get("action")
+            quantity = request.data.get("quantity")
+            notes = request.data.get("notes", "")
+            
+            print(f"Action: {action}, Quantity: {quantity}, Notes: {notes}")
+            
+            # Validate required fields
+            if not action:
+                return Response(
+                    {"error": "action is required (set, add, or subtract)"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+            if quantity is None:
+                return Response(
+                    {"error": "quantity is required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Convert quantity to int
+            try:
+                quantity_int = int(quantity)
+            except (ValueError, TypeError):
+                return Response(
+                    {"error": "quantity must be a valid integer"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate action
+            if action not in ['set', 'add', 'subtract']:
+                return Response(
+                    {"error": f"Invalid action: {action}. Must be 'set', 'add', or 'subtract'"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Call service layer
+            updated_stock = StoreStockService.adjust_stock(
+                stock=stock,
+                action=action,
+                quantity=quantity_int,
+                user=request.user,
+                notes=notes,
+            )
+            
+            serializer = self.get_serializer(updated_stock)
+            return Response(serializer.data)
+            
+        except ValueError as e:
             return Response(
-                {'error': 'store_id parameter is required'}, 
+                {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+        except Exception as e:
+            print(f"Unexpected error: {str(e)}")
+            return Response(
+                {"error": f"An unexpected error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    # =========================================================
+    # STORE INVENTORY
+    # =========================================================
+    @action(detail=False, methods=['get'])
+    def store_inventory(self, request):
+        """
+        Get complete inventory for a specific store
+        """
+        store_id = request.query_params.get('store_id')
+
+        if not store_id:
+            return Response(
+                {'error': 'store_id parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         store_stocks = self.get_queryset().filter(store_id=store_id)
         serializer = self.get_serializer(store_stocks, many=True)
         return Response(serializer.data)
 
+    # =========================================================
+    # LOW STOCK ALERTS
+    # =========================================================
     @action(detail=False, methods=['get'])
     def low_stock_alerts(self, request):
-        """Get low stock alerts across all stores"""
+        """
+        Get low stock alerts across all stores
+        """
         low_stock = self.get_queryset().filter(
             quantity__lte=F('product__reorder_level')
         ).select_related('product', 'store')
-        
+
         serializer = self.get_serializer(low_stock, many=True)
         return Response(serializer.data)
 
+    # =========================================================
+    # RETAIL STOCK (FOR POS SYSTEM)
+    # =========================================================
     @action(detail=False, methods=['get'])
     def retail_stock(self, request):
-        """Get stock only from retail stores (for POS)"""
-        retail_stores = Store.objects.filter(store_type=Store.RETAIL)
-        retail_stocks = self.get_queryset().filter(store__in=retail_stores)
+        """
+        Get stock only from retail stores (for POS)
+        """
+        retail_stocks = self.get_queryset().filter(
+            store__store_type=Store.RETAIL
+        )
+
         serializer = self.get_serializer(retail_stocks, many=True)
         return Response(serializer.data)
-
-
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -1779,96 +1181,526 @@ class StockTransactionViewSet(viewsets.ModelViewSet):
 
 
 
+# @method_decorator(csrf_exempt, name='dispatch')
+# class StockTransferViewSet(viewsets.ModelViewSet):
+#     queryset = StockTransfer.objects.all().select_related(
+#         'product', 'from_store', 'to_store', 'performed_by'
+#     )
+#     serializer_class = StockTransferSerializer
+#     filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
+#     filterset_fields = ['from_store', 'to_store', 'product']
+#     search_fields = ['product__name', 'product__sku', 'notes']
+#     ordering_fields = ['created_at', 'quantity']
+#     ordering = ['-created_at']
+
+#     def get_queryset(self):
+#         queryset = super().get_queryset()
+        
+#         # Date range filtering
+#         date_from = self.request.query_params.get('date_from')
+#         date_to = self.request.query_params.get('date_to')
+        
+#         if date_from:
+#             queryset = queryset.filter(created_at__gte=date_from)
+#         if date_to:
+#             queryset = queryset.filter(created_at__lte=date_to)
+        
+#         # Store type filtering
+#         store_type = self.request.query_params.get('store_type')
+#         if store_type:
+#             queryset = queryset.filter(
+#                 Q(from_store__store_type=store_type) | 
+#                 Q(to_store__store_type=store_type)
+#             )
+        
+#         return queryset
+
+#     # def perform_create(self, serializer):
+#     #     # Auto-assign the current user as performer
+#     #     serializer.save(performed_by=self.request.user)
+
+#     def perform_create(self, serializer):
+#         user = self.request.user if self.request.user.is_authenticated else None
+#         serializer.save(performed_by=user)
+
+#     @action(detail=False, methods=['get'])
+#     def summary(self, request):
+#         """Get transfer summary statistics"""
+#         queryset = self.filter_queryset(self.get_queryset())
+        
+#         summary = {
+#             'total_transfers': queryset.count(),
+#             'total_quantity': queryset.aggregate(
+#                 total=Sum('quantity')
+#             )['total'] or 0,
+#             'today': queryset.filter(
+#                 created_at__date=timezone.now().date()
+#             ).count(),
+#             'by_store': {},
+#         }
+        
+#         # Get unique stores involved
+#         stores = set()
+#         for transfer in queryset:
+#             stores.add(transfer.from_store)
+#             stores.add(transfer.to_store)
+        
+#         for store in stores:
+#             outgoing = queryset.filter(from_store=store).aggregate(
+#                 total=Sum('quantity')
+#             )['total'] or 0
+            
+#             incoming = queryset.filter(to_store=store).aggregate(
+#                 total=Sum('quantity')
+#             )['total'] or 0
+            
+#             summary['by_store'][store.name] = {
+#                 'outgoing': outgoing,
+#                 'incoming': incoming,
+#                 'net': incoming - outgoing
+#             }
+        
+#         return Response(summary)
+
+#     @action(detail=False, methods=['get'])
+#     def recent(self, request):
+#         """Get recent transfers (last 7 days)"""
+#         recent_date = timezone.now() - timezone.timedelta(days=7)
+#         recent_transfers = self.get_queryset().filter(
+#             created_at__gte=recent_date
+#         )[:10]
+        
+#         serializer = self.get_serializer(recent_transfers, many=True)
+#         return Response(serializer.data)
+
+# from django.utils import timezone
+# from django.db.models import Sum, Q
+# from django.db import transaction
+# from rest_framework import viewsets, filters
+# from rest_framework.decorators import action
+# from rest_framework.response import Response
+# from django_filters.rest_framework import DjangoFilterBackend
+
+# @method_decorator(csrf_exempt, name='dispatch')
+# class StockTransferViewSet(viewsets.ModelViewSet):
+
+#     queryset = StockTransfer.objects.all().select_related(
+#         'product', 'from_store', 'to_store', 'performed_by'
+#     )
+#     serializer_class = StockTransferSerializer
+
+#     filter_backends = [
+#         DjangoFilterBackend,
+#         filters.OrderingFilter,
+#         filters.SearchFilter
+#     ]
+
+#     filterset_fields = ['from_store', 'to_store', 'product']
+#     search_fields = ['product__name', 'product__sku', 'notes']
+#     ordering_fields = ['created_at', 'quantity']
+#     ordering = ['-created_at']
+
+#     # -------------------------------------------------
+#     # QUERYSET FILTERING (unchanged but safe)
+#     # -------------------------------------------------
+#     def get_queryset(self):
+#         queryset = super().get_queryset()
+
+#         date_from = self.request.query_params.get('date_from')
+#         date_to = self.request.query_params.get('date_to')
+#         store_type = self.request.query_params.get('store_type')
+
+#         if date_from:
+#             queryset = queryset.filter(created_at__gte=date_from)
+
+#         if date_to:
+#             queryset = queryset.filter(created_at__lte=date_to)
+
+#         if store_type:
+#             queryset = queryset.filter(
+#                 Q(from_store__store_type=store_type) |
+#                 Q(to_store__store_type=store_type)
+#             )
+
+#         return queryset
+
+#     # -------------------------------------------------
+#     # CREATE TRANSFER (IMPORTANT CHANGE)
+#     # -------------------------------------------------
+#     @transaction.atomic
+#     def perform_create(self, serializer):
+
+#         user = self.request.user if self.request.user.is_authenticated else None
+
+#         from_store = serializer.validated_data['from_store']
+#         to_store = serializer.validated_data['to_store']
+#         product = serializer.validated_data['product']
+#         quantity = serializer.validated_data['quantity']
+#         notes = serializer.validated_data.get('notes', '')
+
+#         # 🔥 CORE CHANGE: use service layer instead of direct save
+#         result = StoreStockService.transfer_stock(
+#             product=product,
+#             from_store=from_store,
+#             to_store=to_store,
+#             quantity=quantity,
+#             user=user,
+#             reference=f"TRANSFER-{timezone.now().timestamp()}",
+#             remarks=notes
+#         )
+
+#         # Save ONLY the "parent transfer record"
+#         # using OUT transaction as reference point
+#         serializer.save(
+#             performed_by=user,
+#             transfer_id=result["transfer_id"]
+#         )
+
+#     # -------------------------------------------------
+#     # SUMMARY (optimized slightly)
+#     # -------------------------------------------------
+#     @action(detail=False, methods=['get'])
+#     def summary(self, request):
+
+#         queryset = self.filter_queryset(self.get_queryset())
+
+#         summary = {
+#             'total_transfers': queryset.count(),
+#             'total_quantity': queryset.aggregate(
+#                 total=Sum('quantity')
+#             )['total'] or 0,
+#             'today': queryset.filter(
+#                 created_at__date=timezone.now().date()
+#             ).count(),
+#             'by_store': {},
+#         }
+
+#         stores = set()
+#         for t in queryset:
+#             stores.add(t.from_store)
+#             stores.add(t.to_store)
+
+#         for store in stores:
+#             outgoing = queryset.filter(from_store=store).aggregate(
+#                 total=Sum('quantity')
+#             )['total'] or 0
+
+#             incoming = queryset.filter(to_store=store).aggregate(
+#                 total=Sum('quantity')
+#             )['total'] or 0
+
+#             summary['by_store'][store.name] = {
+#                 'outgoing': outgoing,
+#                 'incoming': incoming,
+#                 'net': incoming - outgoing
+#             }
+
+#         return Response(summary)
+
+#     # -------------------------------------------------
+#     # RECENT (unchanged)
+#     # -------------------------------------------------
+#     @action(detail=False, methods=['get'])
+#     def recent(self, request):
+
+#         recent_date = timezone.now() - timezone.timedelta(days=7)
+
+#         recent_transfers = self.get_queryset().filter(
+#             created_at__gte=recent_date
+#         )[:10]
+
+#         serializer = self.get_serializer(recent_transfers, many=True)
+#         return Response(serializer.data)
+
+from django.db import transaction
+from django.db.models import Q, Sum
+from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+
+from rest_framework import viewsets, filters, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
+from django_filters.rest_framework import DjangoFilterBackend
+
+# from inventory.models import StockTransfer
+from .serializers import (
+    StockTransferSerializer,
+    StockTransferCreateSerializer
+)
+# from inventory.services import StoreStockService
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class StockTransferViewSet(viewsets.ModelViewSet):
+
     queryset = StockTransfer.objects.all().select_related(
-        'product', 'from_store', 'to_store', 'performed_by'
+        'product',
+        'from_store',
+        'to_store',
+        'performed_by'
     )
-    serializer_class = StockTransferSerializer
-    filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
-    filterset_fields = ['from_store', 'to_store', 'product']
-    search_fields = ['product__name', 'product__sku', 'notes']
-    ordering_fields = ['created_at', 'quantity']
+
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.OrderingFilter,
+        filters.SearchFilter
+    ]
+
+    filterset_fields = [
+        'from_store',
+        'to_store',
+        'product',
+        'status'
+    ]
+
+    search_fields = [
+        'product__name',
+        'product__sku',
+        'notes',
+        'transfer_code'
+    ]
+
+    ordering_fields = [
+        'created_at',
+        'quantity'
+    ]
+
     ordering = ['-created_at']
 
+    # -------------------------------------------------
+    # DYNAMIC SERIALIZER
+    # -------------------------------------------------
+    def get_serializer_class(self):
+
+        if self.action == 'create':
+            return StockTransferCreateSerializer
+
+        return StockTransferSerializer
+
+    # -------------------------------------------------
+    # QUERYSET FILTERING
+    # -------------------------------------------------
     def get_queryset(self):
+
         queryset = super().get_queryset()
-        
-        # Date range filtering
+
         date_from = self.request.query_params.get('date_from')
         date_to = self.request.query_params.get('date_to')
-        
-        if date_from:
-            queryset = queryset.filter(created_at__gte=date_from)
-        if date_to:
-            queryset = queryset.filter(created_at__lte=date_to)
-        
-        # Store type filtering
         store_type = self.request.query_params.get('store_type')
+
+        if date_from:
+            queryset = queryset.filter(
+                created_at__date__gte=date_from
+            )
+
+        if date_to:
+            queryset = queryset.filter(
+                created_at__date__lte=date_to
+            )
+
         if store_type:
             queryset = queryset.filter(
-                Q(from_store__store_type=store_type) | 
+                Q(from_store__store_type=store_type) |
                 Q(to_store__store_type=store_type)
             )
-        
+
         return queryset
 
-    # def perform_create(self, serializer):
-    #     # Auto-assign the current user as performer
-    #     serializer.save(performed_by=self.request.user)
+    # -------------------------------------------------
+    # CREATE TRANSFER
+    # -------------------------------------------------
+    
 
-    def perform_create(self, serializer):
-        user = self.request.user if self.request.user.is_authenticated else None
-        serializer.save(performed_by=user)
+    # def create(self, request, *args, **kwargs):
 
+    #     serializer = self.get_serializer(data=request.data)
+    #     serializer.is_valid(raise_exception=True)
+
+    #     validated = serializer.validated_data
+
+    #     user = (
+    #         request.user
+    #         if request.user.is_authenticated
+    #         else None
+    #     )
+
+    #     result = StoreStockService.transfer_stock(
+    #         product=validated['product'],
+    #         from_store=validated['from_store'],
+    #         to_store=validated['to_store'],
+    #         quantity=validated['quantity'],
+    #         user=user,
+    #         reference=f"TRANSFER-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+    #         remarks=validated.get('notes', '')
+    #     )
+    #     print("the ")
+    #     response_serializer = StockTransferSerializer(
+    #         result["transfer"],
+    #         context={'request': request}
+    #     )
+
+    #     return Response(
+    #         response_serializer.data,
+    #         status=status.HTTP_201_CREATED
+    #     )
+    
+    # -------------------------------------------------
+    # CREATE TRANSFER
+    # -------------------------------------------------
+    def create(self, request, *args, **kwargs):
+
+        print("\n========== STOCK TRANSFER REQUEST ==========")
+        print("Incoming request data:", request.data)
+
+        serializer = self.get_serializer(data=request.data)
+
+        if not serializer.is_valid():
+
+            print("\n❌ VALIDATION FAILED")
+            print("Errors:", serializer.errors)
+
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        print("\n✅ VALIDATION PASSED")
+
+        validated = serializer.validated_data
+
+        user = (
+            request.user
+            if request.user.is_authenticated
+            else None
+        )
+
+        print("\n--- TRANSFER DETAILS ---")
+        print("Product:", validated['product'])
+        print("From Store:", validated['from_store'])
+        print("To Store:", validated['to_store'])
+        print("Quantity:", validated['quantity'])
+        print("User:", user)
+        print("Notes:", validated.get('notes', ''))
+
+        try:
+
+            print("\n🚀 STARTING TRANSFER SERVICE")
+
+            result = StoreStockService.transfer_stock(
+                product=validated['product'],
+                from_store=validated['from_store'],
+                to_store=validated['to_store'],
+                quantity=validated['quantity'],
+                user=user,
+                reference=f"TRANSFER-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                remarks=validated.get('notes', '')
+            )
+
+            print("\n✅ TRANSFER SERVICE COMPLETED")
+
+            print("\n--- TRANSFER RESULT ---")
+            print("Transfer Code:", result["transfer"].transfer_code)
+            print("Transfer Object:", result["transfer"])
+            print("OUT Transaction:", result["out_transaction"])
+            print("IN Transaction:", result["in_transaction"])
+
+        except Exception as e:
+
+            print("\n❌ TRANSFER FAILED")
+            print("Error:", str(e))
+
+            return Response(
+                {
+                    "detail": str(e)
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        response_serializer = StockTransferSerializer(
+            result["transfer"],
+            context={'request': request}
+        )
+
+        print("\n✅ RESPONSE SERIALIZED")
+        print("Response Data:", response_serializer.data)
+
+        print("\n========== TRANSFER COMPLETE ==========\n")
+
+        return Response(
+            response_serializer.data,
+            status=status.HTTP_201_CREATED
+        )
+    # -------------------------------------------------
+    # SUMMARY
+    # -------------------------------------------------
     @action(detail=False, methods=['get'])
     def summary(self, request):
-        """Get transfer summary statistics"""
-        queryset = self.filter_queryset(self.get_queryset())
-        
+
+        queryset = self.filter_queryset(
+            self.get_queryset()
+        )
+
         summary = {
             'total_transfers': queryset.count(),
+
             'total_quantity': queryset.aggregate(
                 total=Sum('quantity')
             )['total'] or 0,
+
             'today': queryset.filter(
                 created_at__date=timezone.now().date()
             ).count(),
-            'by_store': {},
+
+            'by_store': {}
         }
-        
-        # Get unique stores involved
+
         stores = set()
+
         for transfer in queryset:
             stores.add(transfer.from_store)
             stores.add(transfer.to_store)
-        
+
         for store in stores:
-            outgoing = queryset.filter(from_store=store).aggregate(
+
+            outgoing = queryset.filter(
+                from_store=store
+            ).aggregate(
                 total=Sum('quantity')
             )['total'] or 0
-            
-            incoming = queryset.filter(to_store=store).aggregate(
+
+            incoming = queryset.filter(
+                to_store=store
+            ).aggregate(
                 total=Sum('quantity')
             )['total'] or 0
-            
+
             summary['by_store'][store.name] = {
                 'outgoing': outgoing,
                 'incoming': incoming,
                 'net': incoming - outgoing
             }
-        
+
         return Response(summary)
 
+    # -------------------------------------------------
+    # RECENT TRANSFERS
+    # -------------------------------------------------
     @action(detail=False, methods=['get'])
     def recent(self, request):
-        """Get recent transfers (last 7 days)"""
+
         recent_date = timezone.now() - timezone.timedelta(days=7)
+
         recent_transfers = self.get_queryset().filter(
             created_at__gte=recent_date
         )[:10]
-        
-        serializer = self.get_serializer(recent_transfers, many=True)
+
+        serializer = self.get_serializer(
+            recent_transfers,
+            many=True
+        )
+
         return Response(serializer.data)
 
 
@@ -2113,148 +1945,483 @@ class BulkRestockViewSet(viewsets.ModelViewSet):
     # ---------------------------------------------------
     # 3. UPLOAD COMPLETED TEMPLATE
     # ---------------------------------------------------
+    # @action(detail=True, methods=['post'])
+    # def upload_completed(self, request, pk=None):
+    #     print("the upload is ", request)
+    #     restock = self.get_object()
+
+    #     if restock.completed:
+    #         return Response({'error': 'Restock already completed'},
+    #                         status=status.HTTP_400_BAD_REQUEST)
+
+    #     file = request.FILES.get("file")
+    #     if not file:
+    #         return Response({'error': 'Excel file is required'},
+    #                         status=status.HTTP_400_BAD_REQUEST)
+
+    #     try:
+    #         # Read Excel file
+    #         df = pd.read_excel(file, sheet_name='Restock Template')
+            
+    #         # Validate required columns
+    #         required_columns = ['ID', 'New Stock']
+    #         missing_columns = [col for col in required_columns if col not in df.columns]
+    #         if missing_columns:
+    #             return Response({'error': f'Missing required columns: {", ".join(missing_columns)}'},
+    #                             status=status.HTTP_400_BAD_REQUEST)
+
+    #         updated_count = 0
+    #         errors = []
+    #         error_rows = []
+
+    #         with transaction.atomic():
+    #             for index, row in df.iterrows():
+    #                 row_num = index + 2  # Excel rows start at 1, plus header row
+                    
+    #                 # Skip empty rows
+    #                 if pd.isna(row.get('ID')):
+    #                     continue
+                    
+    #                 try:
+    #                     product_id = int(row['ID'])
+    #                 except (ValueError, TypeError):
+    #                     error_msg = f"Invalid Product ID: {row.get('ID')}"
+    #                     errors.append(f"Row {row_num}: {error_msg}")
+    #                     error_rows.append({
+    #                         'Row': row_num,
+    #                         'ID': row.get('ID'),
+    #                         'Product': row.get('Product', ''),
+    #                         'Error': error_msg
+    #                     })
+    #                     continue
+
+    #                 try:
+    #                     item = BulkRestockItem.objects.get(
+    #                         restock=restock,
+    #                         product_id=product_id
+    #                     )
+    #                 except BulkRestockItem.DoesNotExist:
+    #                     error_msg = f"Product ID {product_id} not found in this restock session"
+    #                     errors.append(f"Row {row_num}: {error_msg}")
+    #                     error_rows.append({
+    #                         'Row': row_num,
+    #                         'ID': product_id,
+    #                         'Product': row.get('Product', ''),
+    #                         'Error': error_msg
+    #                     })
+    #                     continue
+
+    #                 # Validate and update stock quantity
+    #                 try:
+    #                     new_qty = float(row['New Stock'])
+    #                     if new_qty < 0:
+    #                         error_msg = "New Stock cannot be negative"
+    #                         errors.append(f"Row {row_num}: {error_msg}")
+    #                         error_rows.append({
+    #                             'Row': row_num,
+    #                             'ID': product_id,
+    #                             'Product': row.get('Product', ''),
+    #                             'Error': error_msg
+    #                         })
+    #                         continue
+    #                     # Convert to integer if it's a whole number
+    #                     if new_qty.is_integer():
+    #                         new_qty = int(new_qty)
+    #                 except (ValueError, TypeError):
+    #                     error_msg = "Invalid New Stock value (must be a number)"
+    #                     errors.append(f"Row {row_num}: {error_msg}")
+    #                     error_rows.append({
+    #                         'Row': row_num,
+    #                         'ID': product_id,
+    #                         'Product': row.get('Product', ''),
+    #                         'Error': error_msg
+    #                     })
+    #                     continue
+
+    #                 # Update price if provided and valid
+    #                 new_price = None
+    #                 if 'New Price' in df.columns and not pd.isna(row['New Price']):
+    #                     try:
+    #                         new_price = float(row['New Price'])
+    #                         if new_price < 0:
+    #                             error_msg = "New Price cannot be negative"
+    #                             errors.append(f"Row {row_num}: {error_msg}")
+    #                             error_rows.append({
+    #                                 'Row': row_num,
+    #                                 'ID': product_id,
+    #                                 'Product': row.get('Product', ''),
+    #                                 'Error': error_msg
+    #                             })
+    #                             continue
+    #                     except (ValueError, TypeError):
+    #                         error_msg = "Invalid New Price value (must be a number)"
+    #                         errors.append(f"Row {row_num}: {error_msg}")
+    #                         error_rows.append({
+    #                             'Row': row_num,
+    #                             'ID': product_id,
+    #                             'Product': row.get('Product', ''),
+    #                             'Error': error_msg
+    #                         })
+    #                         continue
+
+    #                 # Update the item
+    #                 item.new_quantity = new_qty
+    #                 if new_price is not None:
+    #                     item.new_price = new_price
+    #                 item.save()
+    #                 updated_count += 1
+
+    #             # If there are errors, create error report
+    #             if errors:
+    #                 error_file_base64 = self._create_error_report(error_rows, errors)
+                    
+    #                 return Response({
+    #                     'error': f'Found {len(errors)} errors. Please fix and re-upload.',
+    #                     'errors': errors[:10],  # Return first 10 errors
+    #                     'error_count': len(errors),
+    #                     'successful_updates': updated_count,
+    #                     'error_file': error_file_base64
+    #                 }, status=status.HTTP_400_BAD_REQUEST)
+
+    #             # Process the restock if no errors
+    #             restock.process_restock()
+    #             restock.notes = request.data.get('notes', restock.notes)
+    #             restock.completed_by = request.user if request.user.is_authenticated else None
+    #             restock.save()
+
+    #         return Response({
+    #             "message": f"✅ Restock completed successfully! {updated_count} items updated.",
+    #             "restock_id": restock.id,
+    #             "completed": True,
+    #             "items_updated": updated_count,
+    #             "store": restock.store.name,
+    #             "timestamp": timezone.now().isoformat()
+    #         })
+
+    #     except Exception as e:
+    #         return Response({'error': f'Processing error: {str(e)}'},
+    #                         status=status.HTTP_400_BAD_REQUEST)
     @action(detail=True, methods=['post'])
     def upload_completed(self, request, pk=None):
+
+        print("\n========== UPLOAD COMPLETED START ==========")
+        print("REQUEST:", request)
+        print("METHOD:", request.method)
+        print("PATH:", request.path)
+        print("CONTENT TYPE:", request.content_type)
+        print("FILES:", request.FILES)
+        print("DATA:", request.data)
+
         restock = self.get_object()
 
+        print("RESTOCK ID:", restock.id)
+
         if restock.completed:
-            return Response({'error': 'Restock already completed'},
-                            status=status.HTTP_400_BAD_REQUEST)
+            print("ERROR: Restock already completed")
+            return Response(
+                {'error': 'Restock already completed'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         file = request.FILES.get("file")
+
+        print("UPLOADED FILE:", file)
+
         if not file:
-            return Response({'error': 'Excel file is required'},
-                            status=status.HTTP_400_BAD_REQUEST)
+            print("ERROR: No file uploaded")
+            return Response(
+                {'error': 'Excel file is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
-            # Read Excel file
+            print("Reading Excel file...")
+
             df = pd.read_excel(file, sheet_name='Restock Template')
-            
+
+            print("Excel loaded successfully")
+            print("COLUMNS:", list(df.columns))
+            print("TOTAL ROWS:", len(df))
+
             # Validate required columns
             required_columns = ['ID', 'New Stock']
-            missing_columns = [col for col in required_columns if col not in df.columns]
+
+            missing_columns = [
+                col for col in required_columns if col not in df.columns
+            ]
+
             if missing_columns:
-                return Response({'error': f'Missing required columns: {", ".join(missing_columns)}'},
-                                status=status.HTTP_400_BAD_REQUEST)
+                print("ERROR: Missing columns:", missing_columns)
+
+                return Response(
+                    {
+                        'error': f'Missing required columns: {", ".join(missing_columns)}'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
             updated_count = 0
             errors = []
             error_rows = []
 
-            with transaction.atomic():
-                for index, row in df.iterrows():
-                    row_num = index + 2  # Excel rows start at 1, plus header row
-                    
-                    # Skip empty rows
-                    if pd.isna(row.get('ID')):
-                        continue
-                    
-                    try:
-                        product_id = int(row['ID'])
-                    except (ValueError, TypeError):
-                        error_msg = f"Invalid Product ID: {row.get('ID')}"
+            # REMOVED transaction.atomic()
+
+            for index, row in df.iterrows():
+
+                row_num = index + 2
+
+                print(f"\n----- PROCESSING ROW {row_num} -----")
+                print("RAW ROW:", row.to_dict())
+
+                # Skip empty rows
+                if pd.isna(row.get('ID')):
+                    print("Skipping empty row")
+                    continue
+
+                try:
+                    product_id = int(row['ID'])
+                    print("PRODUCT ID:", product_id)
+
+                except (ValueError, TypeError) as e:
+
+                    print("INVALID PRODUCT ID:", e)
+
+                    error_msg = f"Invalid Product ID: {row.get('ID')}"
+
+                    errors.append(f"Row {row_num}: {error_msg}")
+
+                    error_rows.append({
+                        'Row': row_num,
+                        'ID': row.get('ID'),
+                        'Product': row.get('Product', ''),
+                        'Error': error_msg
+                    })
+
+                    continue
+
+                try:
+                    item = BulkRestockItem.objects.get(
+                        restock=restock,
+                        product_id=product_id
+                    )
+
+                    print("FOUND ITEM:", item.id)
+
+                except BulkRestockItem.DoesNotExist:
+
+                    print("ITEM NOT FOUND")
+
+                    error_msg = (
+                        f"Product ID {product_id} not found in this restock session"
+                    )
+
+                    errors.append(f"Row {row_num}: {error_msg}")
+
+                    error_rows.append({
+                        'Row': row_num,
+                        'ID': product_id,
+                        'Product': row.get('Product', ''),
+                        'Error': error_msg
+                    })
+
+                    continue
+
+                # Validate stock quantity
+                try:
+                    new_qty = float(row['New Stock'])
+
+                    print("NEW QTY:", new_qty)
+
+                    if pd.isna(new_qty):
+                        raise ValueError("Quantity is NaN")
+
+                    if new_qty < 0:
+
+                        print("NEGATIVE QUANTITY DETECTED")
+
+                        error_msg = "New Stock cannot be negative"
+
                         errors.append(f"Row {row_num}: {error_msg}")
+
                         error_rows.append({
                             'Row': row_num,
-                            'ID': row.get('ID'),
+                            'ID': product_id,
                             'Product': row.get('Product', ''),
                             'Error': error_msg
                         })
+
                         continue
 
+                    if new_qty.is_integer():
+                        new_qty = int(new_qty)
+
+                    print("FINAL NEW QTY:", new_qty)
+
+                except (ValueError, TypeError) as e:
+
+                    print("INVALID STOCK VALUE:", e)
+
+                    error_msg = "Invalid New Stock value (must be a number)"
+
+                    errors.append(f"Row {row_num}: {error_msg}")
+
+                    error_rows.append({
+                        'Row': row_num,
+                        'ID': product_id,
+                        'Product': row.get('Product', ''),
+                        'Error': error_msg
+                    })
+
+                    continue
+
+                # Validate price
+                new_price = None
+
+                if 'New Price' in df.columns and not pd.isna(row['New Price']):
+
                     try:
-                        item = BulkRestockItem.objects.get(
-                            restock=restock,
-                            product_id=product_id
+                        new_price = float(row['New Price'])
+
+                        print("NEW PRICE:", new_price)
+
+                        if new_price < 0:
+
+                            print("NEGATIVE PRICE DETECTED")
+
+                            error_msg = "New Price cannot be negative"
+
+                            errors.append(f"Row {row_num}: {error_msg}")
+
+                            error_rows.append({
+                                'Row': row_num,
+                                'ID': product_id,
+                                'Product': row.get('Product', ''),
+                                'Error': error_msg
+                            })
+
+                            continue
+
+                    except (ValueError, TypeError) as e:
+
+                        print("INVALID PRICE:", e)
+
+                        error_msg = (
+                            "Invalid New Price value (must be a number)"
                         )
-                    except BulkRestockItem.DoesNotExist:
-                        error_msg = f"Product ID {product_id} not found in this restock session"
+
                         errors.append(f"Row {row_num}: {error_msg}")
+
                         error_rows.append({
                             'Row': row_num,
                             'ID': product_id,
                             'Product': row.get('Product', ''),
                             'Error': error_msg
                         })
+
                         continue
 
-                    # Validate and update stock quantity
-                    try:
-                        new_qty = float(row['New Stock'])
-                        if new_qty < 0:
-                            error_msg = "New Stock cannot be negative"
-                            errors.append(f"Row {row_num}: {error_msg}")
-                            error_rows.append({
-                                'Row': row_num,
-                                'ID': product_id,
-                                'Product': row.get('Product', ''),
-                                'Error': error_msg
-                            })
-                            continue
-                        # Convert to integer if it's a whole number
-                        if new_qty.is_integer():
-                            new_qty = int(new_qty)
-                    except (ValueError, TypeError):
-                        error_msg = "Invalid New Stock value (must be a number)"
-                        errors.append(f"Row {row_num}: {error_msg}")
-                        error_rows.append({
-                            'Row': row_num,
-                            'ID': product_id,
-                            'Product': row.get('Product', ''),
-                            'Error': error_msg
-                        })
-                        continue
+                # SAVE ITEM
+                try:
 
-                    # Update price if provided and valid
-                    new_price = None
-                    if 'New Price' in df.columns and not pd.isna(row['New Price']):
-                        try:
-                            new_price = float(row['New Price'])
-                            if new_price < 0:
-                                error_msg = "New Price cannot be negative"
-                                errors.append(f"Row {row_num}: {error_msg}")
-                                error_rows.append({
-                                    'Row': row_num,
-                                    'ID': product_id,
-                                    'Product': row.get('Product', ''),
-                                    'Error': error_msg
-                                })
-                                continue
-                        except (ValueError, TypeError):
-                            error_msg = "Invalid New Price value (must be a number)"
-                            errors.append(f"Row {row_num}: {error_msg}")
-                            error_rows.append({
-                                'Row': row_num,
-                                'ID': product_id,
-                                'Product': row.get('Product', ''),
-                                'Error': error_msg
-                            })
-                            continue
+                    print("Saving item...")
 
-                    # Update the item
                     item.new_quantity = new_qty
+
                     if new_price is not None:
                         item.new_price = new_price
+
                     item.save()
+
+                    print("ITEM SAVED SUCCESSFULLY")
+
                     updated_count += 1
 
-                # If there are errors, create error report
-                if errors:
-                    error_file_base64 = self._create_error_report(error_rows, errors)
-                    
-                    return Response({
-                        'error': f'Found {len(errors)} errors. Please fix and re-upload.',
-                        'errors': errors[:10],  # Return first 10 errors
-                        'error_count': len(errors),
-                        'successful_updates': updated_count,
-                        'error_file': error_file_base64
-                    }, status=status.HTTP_400_BAD_REQUEST)
+                except Exception as save_error:
 
-                # Process the restock if no errors
-                restock.process_restock()
-                restock.notes = request.data.get('notes', restock.notes)
-                restock.completed_by = request.user if request.user.is_authenticated else None
-                restock.save()
+                    print("ITEM SAVE FAILED")
+                    print("ERROR:", str(save_error))
+
+                    errors.append(
+                        f"Row {row_num}: Save failed - {str(save_error)}"
+                    )
+
+                    error_rows.append({
+                        'Row': row_num,
+                        'ID': product_id,
+                        'Product': row.get('Product', ''),
+                        'Error': str(save_error)
+                    })
+
+            print("\n========== VALIDATION COMPLETE ==========")
+            print("TOTAL ERRORS:", len(errors))
+            print("UPDATED COUNT:", updated_count)
+
+            # Generate error report
+            if errors:
+
+                print("Generating error report...")
+
+                error_file_base64 = self._create_error_report(
+                    error_rows,
+                    errors
+                )
+
+                print("ERROR REPORT GENERATED")
+
+                return Response({
+                    'error': f'Found {len(errors)} errors. Please fix and re-upload.',
+                    'errors': errors[:10],
+                    'error_count': len(errors),
+                    'successful_updates': updated_count,
+                    'error_file': error_file_base64
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # PROCESS RESTOCK
+            try:
+
+                print("\n========== PROCESSING RESTOCK ==========")
+
+                # restock.process_restock()
+                RestockDebugService(restock).process()
+
+                print("RESTOCK PROCESSED SUCCESSFULLY")
+
+            except Exception as process_error:
+
+                print("RESTOCK PROCESSING FAILED")
+                print("ERROR:", str(process_error))
+
+                errors.append(str(process_error))
+
+                error_rows.append({
+                    'Row': 'SYSTEM',
+                    'ID': '',
+                    'Product': '',
+                    'Error': str(process_error)
+                })
+
+                error_file_base64 = self._create_error_report(
+                    error_rows,
+                    errors
+                )
+
+                return Response({
+                    'error': f'Processing failed: {str(process_error)}',
+                    'errors': errors,
+                    'error_count': len(errors),
+                    'successful_updates': updated_count,
+                    'error_file': error_file_base64
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            restock.notes = request.data.get('notes', restock.notes)
+
+            restock.completed_by = (
+                request.user if request.user.is_authenticated else None
+            )
+
+            restock.save()
+
+            print("\n========== SUCCESS ==========")
 
             return Response({
                 "message": f"✅ Restock completed successfully! {updated_count} items updated.",
@@ -2266,62 +2433,70 @@ class BulkRestockViewSet(viewsets.ModelViewSet):
             })
 
         except Exception as e:
-            return Response({'error': f'Processing error: {str(e)}'},
-                            status=status.HTTP_400_BAD_REQUEST)
 
+            import traceback
+
+            print("\n========== FATAL ERROR ==========")
+
+            traceback.print_exc()
+
+            return Response(
+                {'error': f'Processing error: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
     # ---------------------------------------------------
     # 4. QUICK RESTOCK OPTIONS
     # ---------------------------------------------------
-    @action(detail=False, methods=['get'])
-    def quick_restock_options(self, request):
-        store_id = request.query_params.get('store_id')
-        if not store_id:
-            return Response({'error': 'store_id is required'},
-                            status=status.HTTP_400_BAD_REQUEST)
+    # @action(detail=False, methods=['get'])
+    # def quick_restock_options(self, request):
+    #     store_id = request.query_params.get('store_id')
+    #     if not store_id:
+    #         return Response({'error': 'store_id is required'},
+    #                         status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            store = Store.objects.get(id=store_id)
-        except Store.DoesNotExist:
-            return Response({'error': 'Store not found'},
-                            status=status.HTTP_404_NOT_FOUND)
+    #     try:
+    #         store = Store.objects.get(id=store_id)
+    #     except Store.DoesNotExist:
+    #         return Response({'error': 'Store not found'},
+    #                         status=status.HTTP_404_NOT_FOUND)
 
-        # Get categories with product counts and low stock counts
-        categories = Category.objects.filter(is_active=True).annotate(
-            product_count=Count('products', filter=Q(products__is_active=True)),
-            low_stock_count=Count(
-                'products',
-                filter=Q(
-                    products__is_active=True,
-                    products__storestocks__store=store,
-                    products__storestocks__quantity__lte=F('products__reorder_level')
-                )
-            )
-        ).values('id', 'name', 'product_count', 'low_stock_count')
+    #     # Get categories with product counts and low stock counts
+    #     categories = Category.objects.filter(is_active=True).annotate(
+    #         product_count=Count('products', filter=Q(products__is_active=True)),
+    #         low_stock_count=Count(
+    #             'products',
+    #             filter=Q(
+    #                 products__is_active=True,
+    #                 products__storestocks__store=store,
+    #                 products__storestocks__quantity__lte=F('products__reorder_level')
+    #             )
+    #         )
+    #     ).values('id', 'name', 'product_count', 'low_stock_count')
 
-        # Get low stock products count
-        low_stock_total = StoreStock.objects.filter(
-            store=store,
-            quantity__lte=F('product__reorder_level'),
-            product__is_active=True
-        ).count()
+    #     # Get low stock products count
+    #     low_stock_total = StoreStock.objects.filter(
+    #         store=store,
+    #         quantity__lte=F('product__reorder_level'),
+    #         product__is_active=True
+    #     ).count()
 
-        # Get total products count for this store
-        total_products_store = StoreStock.objects.filter(store=store, product__is_active=True).count()
+    #     # Get total products count for this store
+    #     total_products_store = StoreStock.objects.filter(store=store, product__is_active=True).count()
 
-        return Response({
-            "store": {
-                "id": store.id,
-                "name": store.name
-            },
-            "categories": list(categories),
-            "low_stock_products": low_stock_total,
-            "total_products": total_products_store,
-            "summary": {
-                "all_products": total_products_store,
-                "low_stock": low_stock_total,
-                "healthy_stock": total_products_store - low_stock_total
-            }
-        })
+    #     return Response({
+    #         "store": {
+    #             "id": store.id,
+    #             "name": store.name
+    #         },
+    #         "categories": list(categories),
+    #         "low_stock_products": low_stock_total,
+    #         "total_products": total_products_store,
+    #         "summary": {
+    #             "all_products": total_products_store,
+    #             "low_stock": low_stock_total,
+    #             "healthy_stock": total_products_store - low_stock_total
+    #         }
+    #     })
 
     # ---------------------------------------------------
     # HELPER METHOD: Create error report

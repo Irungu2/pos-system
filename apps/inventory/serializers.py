@@ -43,7 +43,7 @@ class StoreSerializer(serializers.ModelSerializer):
         return obj.get_total_products()
     
     def get_low_stock_count(self, obj):
-        return obj.get_low_stock_products().count()
+        return obj.get_low_stock_products().count() 
 
 
 class StoreStockSerializer(serializers.ModelSerializer):
@@ -247,48 +247,35 @@ class StockTransferSerializer(serializers.ModelSerializer):
 
 
 class StockTransferCreateSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = StockTransfer
-        fields = ['product', 'from_store', 'to_store', 'quantity', 'notes']
-    
+        fields = [
+            'product',
+            'from_store',
+            'to_store',
+            'quantity',
+            'notes'
+        ]
+
     def validate(self, data):
-        product = data['product']
+
         from_store = data['from_store']
         to_store = data['to_store']
         quantity = data['quantity']
-        
-        # Basic validation
+
+        # Basic validation only
         if quantity <= 0:
             raise serializers.ValidationError({
                 'quantity': 'Quantity must be greater than 0'
             })
-        
+
         if from_store == to_store:
             raise serializers.ValidationError({
                 'to_store': 'Source and destination cannot be the same store'
             })
-        
-        # Store type validation
-        if from_store.store_type == Store.RETAIL and to_store.store_type == Store.WAREHOUSE:
-            raise serializers.ValidationError({
-                'to_store': 'Transfers from retail to warehouse are not allowed'
-            })
-        
-        # Stock availability validation
-        try:
-            stock = StoreStock.objects.get(store=from_store, product=product)
-            if stock.quantity < quantity:
-                raise serializers.ValidationError({
-                    'quantity': f'Insufficient stock in {from_store.name}. Available: {stock.quantity}'
-                })
-        except StoreStock.DoesNotExist:
-            raise serializers.ValidationError({
-                'from_store': f'No stock found in {from_store.name} for {product.name}'
-            })
-        
+
         return data
-
-
 # ============================================================
 #  PRODUCT STOCK SUMMARY / INVENTORY DASHBOARD
 # ============================================================

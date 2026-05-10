@@ -1,3 +1,9 @@
+/* ============================================================
+    STORE STOCK MANAGEMENT MODULE - COMPLETE FIXED VERSION
+    Compatible with Django StoreStockViewSet + StoreStockSerializer
+    Manages inventory across different stores
+============================================================ */
+
 /* =============================
    CONFIGURATION
 ============================= */
@@ -489,33 +495,21 @@ class StoreStockAPI {
             config.body = JSON.stringify(data);
         }
 
-        console.log(`Making ${method} request to ${url}`);
-        console.log('Request data:', data);
-        console.log('CSRF token present:', !!this.csrfToken);
+        console.log(`Making ${method} request to ${url} with CSRF token:`, 
+                   this.csrfToken ? 'Present' : 'Missing');
 
         try {
             const response = await fetch(url, config);
             
-            // Clone response for error handling
-            const responseClone = response.clone();
-            
             if (response.status === 403) {
-                const errorData = await response.json().catch(() => ({}));
+                const errorData = await response.json();
                 console.error('CSRF Error Details:', errorData);
                 throw new Error(STORESTOCK_CONFIG.MESSAGES.CSRF_ERROR);
             }
 
             if (!response.ok) {
-                let errorMessage = `HTTP ${response.status}`;
-                try {
-                    const errorData = await response.json();
-                    errorMessage = errorData.error || errorData.detail || errorMessage;
-                    console.error('Error response:', errorData);
-                } catch (e) {
-                    const text = await responseClone.text();
-                    console.error('Error response text:', text);
-                }
-                throw new Error(errorMessage);
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || errorData.error || `HTTP ${response.status}`);
             }
 
             if (response.status === 204) {
@@ -554,40 +548,22 @@ class StoreStockAPI {
     }
 
     async adjustStock(id, data) {
-        console.log('the adjust stock ')
-        try {
-            const response = await this.makeRequest(
-                STORESTOCK_CONFIG.API_ENDPOINTS.STORE_STOCK_DETAIL(id),
-                'PATCH',
-                data
-            );
-            console.log("the adjust stock is ", response)
-            return response;
-        } catch (error) {
-            console.error('Adjust stock API error:', error);
-            throw error;
-        }
+        return this.makeRequest(
+            STORESTOCK_CONFIG.API_ENDPOINTS.STORE_STOCK_DETAIL(id),
+            'PATCH',
+            data
+        );
     }
 
     async checkExisting(storeId, productId) {
-        const url = new URL(STORESTOCK_CONFIG.API_ENDPOINTS.STORE_STOCKS, window.location.origin);
+        const url = new URL(STORESTOCK_CONFIG.API_ENDPOINTS.STORE_STOCKS);
         url.searchParams.append('store', storeId);
         url.searchParams.append('product', productId);
         
-        try {
-            const response = await fetch(url, {
-                headers: {
-                    'X-CSRFToken': this.csrfToken || ''
-                },
-                credentials: 'same-origin'
-            });
-            if (!response.ok) return null;
-            const data = await response.json();
-            return data.length > 0 ? data[0] : null;
-        } catch (error) {
-            console.error('Error checking existing stock:', error);
-            return null;
-        }
+        const response = await fetch(url);
+        if (!response.ok) return [];
+        const data = await response.json();
+        return data.length > 0 ? data[0] : null;
     }
 
     async lowStockAlerts() {
@@ -1014,193 +990,82 @@ class StoreStockController {
         this.state.closeCreateModal();
     }
 
-    // async submitAdjustment() {
-    //     const actionEl = document.querySelector(STORESTOCK_CONFIG.SELECTORS.ADJUST_ACTION);
-    //     const quantityEl = document.querySelector(STORESTOCK_CONFIG.SELECTORS.ADJUST_QUANTITY);
-    //     const notesEl = document.querySelector(STORESTOCK_CONFIG.SELECTORS.ADJUST_NOTES);
-
-    //     if (!actionEl || !quantityEl) {
-    //         StoreStockUtils.showAdjustError('Form elements missing');
-    //         return;
-    //     }
-
-    //     const action = actionEl.value;
-    //     const quantity = parseInt(quantityEl.value, 10);
-    //     const notes = notesEl?.value || '';
-
-    //     // Validate action
-    //     if (!action || !['set', 'add', 'subtract'].includes(action)) {
-    //         StoreStockUtils.showAdjustError('Invalid action type');
-    //         return;
-    //     }
-
-    //     // Validate quantity
-    //     if (isNaN(quantity)) {
-    //         StoreStockUtils.showAdjustError('Please enter a valid quantity');
-    //         return;
-    //     }
-
-    //     if (action !== 'set' && quantity <= 0) {
-    //         StoreStockUtils.showAdjustError(`Quantity must be positive for ${action} action`);
-    //         return;
-    //     }
-
-    //     if (action === 'set' && quantity < 0) {
-    //         StoreStockUtils.showAdjustError('Quantity cannot be negative when setting stock');
-    //         return;
-    //     }
-
-    //     const stockId = this.state.currentAdjustmentId;
-    //     if (!stockId) {
-    //         StoreStockUtils.showAdjustError('Stock record not selected');
-    //         return;
-    //     }
-
-    //     // Create payload - ensure correct data types
-    //     const data = {
-    //         action: action,
-    //         quantity: quantity,
-    //         notes: notes.trim() || ''
-    //     };
-
-    //     console.log('Sending adjustment request:', { stockId, data });
-
-    //     try {
-    //         this.state.setLoading(true, 'adjust');
-
-    //         const response = await this.api.adjustStock(stockId, data);
-            
-    //         console.log('Adjustment response:', response);
-
-    //         StoreStockUtils.showSuccess(STORESTOCK_CONFIG.MESSAGES.SUCCESS_ADJUST);
-
-    //         this.state.closeAdjustModal();
-    //         await this.load();
-
-    //     } catch (err) {
-    //         console.error('Error adjusting stock:', err);
-            
-    //         // Parse error response if available
-    //         let errorMessage = err.message || STORESTOCK_CONFIG.MESSAGES.ERROR_SAVE;
-            
-    //         if (err.response && err.response.data && err.response.data.error) {
-    //             errorMessage = err.response.data.error;
-    //         } else if (err.message && err.message.includes('400')) {
-    //             errorMessage = 'Invalid request. Please check the quantity and action.';
-    //         }
-            
-    //         StoreStockUtils.showAdjustError(errorMessage);
-    //     } finally {
-    //         this.state.setLoading(false, 'adjust');
-    //     }
-    // }
-
     async submitAdjustment() {
-        console.log('hell we are in the submit adjustModal')
-        // Get form elements with more robust selectors
         const actionEl = document.querySelector(STORESTOCK_CONFIG.SELECTORS.ADJUST_ACTION);
         const quantityEl = document.querySelector(STORESTOCK_CONFIG.SELECTORS.ADJUST_QUANTITY);
         const notesEl = document.querySelector(STORESTOCK_CONFIG.SELECTORS.ADJUST_NOTES);
-
-        // Debug: Check if elements exist
-        console.log('Form elements found:', {
-            actionEl: !!actionEl,
-            quantityEl: !!quantityEl,
-            notesEl: !!notesEl
-        });
-
-        if (!actionEl || !quantityEl) {
-            StoreStockUtils.showAdjustError('Form elements missing. Please refresh the page.');
-            console.error('Missing form elements:', { actionEl, quantityEl });
-            return;
-        }
-
-        // Get values and trim/clean them
-        const action = actionEl.value ? actionEl.value.trim() : '';
-        const quantityRaw = quantityEl.value;
-        const notes = notesEl?.value || '';
-
-        // Debug: Log raw values
-        console.log('Raw form values:', {
-            actionRaw: action,
-            quantityRaw: quantityRaw,
-            notes: notes
-        });
-
-        // Validate action is present
-        if (!action) {
-            StoreStockUtils.showAdjustError('Please select an action (Set, Add, or Subtract)');
-            console.error('Action value is empty. Select element value:', actionEl.value);
-            return;
-        }
-
-        // Validate action is valid
-        if (!['set', 'add', 'subtract'].includes(action.toLowerCase())) {
-            StoreStockUtils.showAdjustError(`Invalid action: "${action}". Please select Set, Add, or Subtract.`);
-            return;
-        }
-
-        // Parse quantity
-        const quantity = parseInt(quantityRaw, 10);
         
+        if (!actionEl || !quantityEl) {
+            console.error('Adjustment form elements not found');
+            StoreStockUtils.showAdjustError('Form elements missing');
+            return;
+        }
+
+        const action = actionEl.value;
+        const quantity = parseFloat(quantityEl.value);
+        const notes = notesEl ? notesEl.value : '';
+
         // Validate quantity
-        if (isNaN(quantity)) {
-            StoreStockUtils.showAdjustError('Please enter a valid quantity (numbers only)');
+        if (isNaN(quantity) || quantity < 0) {
+            StoreStockUtils.showAdjustError('Please enter a valid quantity (0 or higher)');
             return;
         }
 
-        // Additional validation based on action
-        if (action.toLowerCase() !== 'set' && quantity <= 0) {
-            StoreStockUtils.showAdjustError(`Quantity must be greater than 0 for ${action} action`);
+        const stock = this.state.stocks.find(s => s.id == this.state.currentAdjustmentId);
+        if (!stock) {
+            StoreStockUtils.showAdjustError('Stock record not found');
             return;
         }
 
-        if (action.toLowerCase() === 'set' && quantity < 0) {
-            StoreStockUtils.showAdjustError('Quantity cannot be negative when setting stock');
+        let newQuantity = stock.quantity;
+        const data = {};
+
+        switch (action) {
+            case 'set':
+                newQuantity = quantity;
+                data.quantity = newQuantity;
+                break;
+            case 'add':
+                newQuantity = stock.quantity + quantity;
+                data.quantity = newQuantity;
+                break;
+            case 'subtract':
+                newQuantity = Math.max(0, stock.quantity - quantity);
+                data.quantity = newQuantity;
+                break;
+            default:
+                StoreStockUtils.showAdjustError('Invalid action selected');
+                return;
+        }
+
+        // Add notes if provided
+        if (notes.trim()) {
+            data.notes = notes;
+        }
+
+        // Validate final quantity
+        if (newQuantity < 0) {
+            StoreStockUtils.showAdjustError('Quantity cannot be negative');
             return;
         }
 
-        const stockId = this.state.currentAdjustmentId;
-        if (!stockId) {
-            StoreStockUtils.showAdjustError('Stock record not selected');
+        if (!StoreStockUtils.validateAdjustment(data)) {
             return;
         }
-
-        // Create payload - ensure action is lowercase to match backend
-        const data = {
-            action: action.toLowerCase(),  // Ensure lowercase
-            quantity: quantity,
-            notes: notes.trim() || ''
-        };
-
-        console.log('Sending adjustment request:', { 
-            stockId, 
-            data,
-            url: STORESTOCK_CONFIG.API_ENDPOINTS.STORE_STOCK_DETAIL(stockId)
-        });
 
         try {
             this.state.setLoading(true, 'adjust');
-
-            const response = await this.api.adjustStock(stockId, data);
             
-            console.log('Adjustment response:', response);
-
+            await this.api.adjustStock(this.state.currentAdjustmentId, data);
             StoreStockUtils.showSuccess(STORESTOCK_CONFIG.MESSAGES.SUCCESS_ADJUST);
-
+            
+            // Close modal and reload data
             this.state.closeAdjustModal();
             await this.load();
 
         } catch (err) {
             console.error('Error adjusting stock:', err);
-            
-            let errorMessage = err.message || STORESTOCK_CONFIG.MESSAGES.ERROR_SAVE;
-            
-            if (err.response && err.response.data && err.response.data.error) {
-                errorMessage = err.response.data.error;
-            }
-            
-            StoreStockUtils.showAdjustError(errorMessage);
+            StoreStockUtils.showAdjustError(err.message || STORESTOCK_CONFIG.MESSAGES.ERROR_SAVE);
         } finally {
             this.state.setLoading(false, 'adjust');
         }
@@ -1220,11 +1085,11 @@ class StoreStockController {
 
         const storeId = storeSelect.value;
         const productId = productSelect.value;
-        const quantity = parseInt(quantityInput.value, 10);
+        const quantity = parseInt(quantityInput.value);
         const notes = notesTextarea ? notesTextarea.value : '';
 
         // Validate form
-        const data = { store: storeId, product: productId, quantity: quantity };
+        const data = { store: storeId, product: productId, quantity };
         if (notes.trim()) {
             data.notes = notes;
         }
@@ -1308,18 +1173,6 @@ document.addEventListener("DOMContentLoaded", () => {
         /* Table Styles */
         #stock-list {
             width: 100%;
-            border-collapse: collapse;
-        }
-        
-        #stock-list th, #stock-list td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #dee2e6;
-        }
-        
-        #stock-list th {
-            background-color: #f8f9fa;
-            font-weight: 600;
         }
         
         #stock-list tr {
@@ -1334,7 +1187,6 @@ document.addEventListener("DOMContentLoaded", () => {
             font-weight: 600;
             padding: 4px 8px;
             border-radius: 4px;
-            display: inline-block;
         }
         
         .stock-low {
@@ -1352,7 +1204,6 @@ document.addEventListener("DOMContentLoaded", () => {
             border-radius: 4px;
             font-size: 0.875em;
             font-weight: 500;
-            display: inline-block;
         }
         
         .status-low {
@@ -1474,7 +1325,6 @@ document.addEventListener("DOMContentLoaded", () => {
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 14px;
-            box-sizing: border-box;
         }
         
         /* Button Styles */
@@ -1527,7 +1377,6 @@ document.addEventListener("DOMContentLoaded", () => {
             display: flex;
             gap: 20px;
             margin-bottom: 20px;
-            flex-wrap: wrap;
         }
         
         .stat-card {
@@ -1537,7 +1386,6 @@ document.addEventListener("DOMContentLoaded", () => {
             border-radius: 8px;
             padding: 20px;
             text-align: center;
-            min-width: 150px;
         }
         
         .stat-value {
@@ -1588,7 +1436,6 @@ document.addEventListener("DOMContentLoaded", () => {
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 14px;
-            box-sizing: border-box;
         }
         
         /* Empty State */
@@ -1612,8 +1459,6 @@ document.addEventListener("DOMContentLoaded", () => {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
         }
         
         #create-stock-btn {
@@ -1624,32 +1469,6 @@ document.addEventListener("DOMContentLoaded", () => {
         
         #create-stock-btn i {
             font-size: 14px;
-        }
-        
-        /* Error styling */
-        .error-message {
-            background-color: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #dc3545;
-            padding: 12px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
-        
-        /* Responsive */
-        @media (max-width: 768px) {
-            .filter-row {
-                flex-direction: column;
-            }
-            
-            .stats-container {
-                flex-direction: column;
-            }
-            
-            #stock-list {
-                display: block;
-                overflow-x: auto;
-            }
         }
     `;
     document.head.appendChild(style);
@@ -1665,10 +1484,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.storeStockController = new StoreStockController();
     
     // Load initial data
-    window.storeStockController.load().catch(error => {
-        console.error('Failed to load initial data:', error);
-        StoreStockUtils.showError('Failed to load stock data. Please refresh the page.');
-    });
+    window.storeStockController.load();
     
     console.log('=== Store Stock Module Initialized ===');
     

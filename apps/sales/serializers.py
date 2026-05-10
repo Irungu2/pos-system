@@ -54,7 +54,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
 #         return attrs
 
 from rest_framework import serializers
-from apps.inventory.services import InventoryService
+from apps.inventory.services import StoreStockService
 
 # class SaleItemCreateSerializer(serializers.Serializer):
 #     product_id = serializers.IntegerField()
@@ -76,7 +76,7 @@ from apps.inventory.services import InventoryService
 #             raise serializers.ValidationError({'product_id': 'Invalid product ID.'})
 
 #         # ✅ SINGLE SOURCE OF TRUTH
-#         available_stock = InventoryService.get_store_stock(product, store)
+#         available_stock = StoreStockService.get_store_stock(product, store)
 
 #         if available_stock < quantity:
 #             raise serializers.ValidationError({

@@ -26,7 +26,7 @@ from apps.account.context_processors import current_user
 from apps.account.models import User
 from apps.inventory.models import Category, Product, Store
 from apps.inventory.serializers import CategorySerializer, ProductSerializer
-from apps.inventory.services import InventoryService
+from apps.inventory.services import StoreStockService
 from apps.inventory.store_utils import get_current_store
 
 
@@ -62,10 +62,69 @@ def role_required(allowed_roles):
     return decorator
 
 
-# @login_required
+# # @login_required
+# @login_required(login_url='/account/login/')
+# def sales_dashboard(request):
+#     """Sales dashboard for the current user"""
+#     today = timezone.now().date()
+#     user = request.user
+
+#     print("\n===== DEBUG: SALES DASHBOARD =====")
+#     print(f"User: {user} (ID: {user.id})")
+#     print(f"Today's Date: {today}")
+
+#     today_sales = Sale.objects.filter(
+#         cashier=user,
+#         timestamp__date=today
+#     ).prefetch_related('items')
+
+#     today_total_sales = today_sales.count()
+#     today_revenue = today_sales.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+#     today_items_sold = SaleItem.objects.filter(sale__in=today_sales).aggregate(
+#         Sum('quantity'))['quantity__sum'] or 0
+
+#     print(f"Dashboard → Sales Count: {today_total_sales}")
+#     print(f"Dashboard → Items Sold Today: {today_items_sold}")
+#     print(f"Dashboard → Revenue Today: {today_revenue}")
+
+#     recent_sales = today_sales.order_by('-timestamp')[:50]
+#     print(f"Dashboard → Recent Sales Count: {recent_sales.count()}")
+
+#     shop = Store.objects.filter(store_type=Store.RETAIL).first()
+#     print(f"Dashboard → Shop Used: {shop}")
+
+#     low_stock_products = Product.objects.filter(
+#         storestock__store=shop,
+#         storestock__quantity__lte=F('reorder_level'),
+#         is_active=True
+#     ).distinct()[:5]
+
+#     print(f"Dashboard → Low Stock Products: {low_stock_products.count()}")
+
+#     top_products_today = SaleItem.objects.filter(sale__in=today_sales).values(
+#         'product__name'
+#     ).annotate(total_sold=Sum('quantity')).order_by('-total_sold')[:5]
+
+#     print(f"Dashboard → Top Products Today Count: {top_products_today.count()}")
+#     print("=====================================\n")
+
+#     context = {
+#         'today_total_sales': today_total_sales,
+#         'today_revenue': today_revenue,
+#         'today_items_sold': today_items_sold,
+#         'recent_sales': recent_sales,
+#         'low_stock_products': low_stock_products,
+#         'top_products_today': top_products_today,
+#         'user_role': getattr(user, 'role', None),
+#         'today': today,
+#     }
+#     print(context)
+#     return render(request, 'sales/pos_base.html', context)
+
 @login_required(login_url='/account/login/')
 def sales_dashboard(request):
     """Sales dashboard for the current user"""
+
     today = timezone.now().date()
     user = request.user
 
@@ -73,40 +132,45 @@ def sales_dashboard(request):
     print(f"User: {user} (ID: {user.id})")
     print(f"Today's Date: {today}")
 
+    # ✅ GET CURRENT STORE
+    shop = get_current_store(request)
+
+    if not shop:
+        raise PermissionDenied("No store selected")
+
+    print(f"Dashboard → Current Store: {shop}")
+
     today_sales = Sale.objects.filter(
         cashier=user,
+        store=shop,   # ✅ IMPORTANT FIX
         timestamp__date=today
     ).prefetch_related('items')
 
     today_total_sales = today_sales.count()
-    today_revenue = today_sales.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
-    today_items_sold = SaleItem.objects.filter(sale__in=today_sales).aggregate(
-        Sum('quantity'))['quantity__sum'] or 0
+    today_revenue = today_sales.aggregate(
+        Sum('total_amount')
+    )['total_amount__sum'] or 0
 
-    print(f"Dashboard → Sales Count: {today_total_sales}")
-    print(f"Dashboard → Items Sold Today: {today_items_sold}")
-    print(f"Dashboard → Revenue Today: {today_revenue}")
+    today_items_sold = SaleItem.objects.filter(
+        sale__in=today_sales
+    ).aggregate(Sum('quantity'))['quantity__sum'] or 0
 
     recent_sales = today_sales.order_by('-timestamp')[:50]
-    print(f"Dashboard → Recent Sales Count: {recent_sales.count()}")
 
-    shop = Store.objects.filter(store_type=Store.RETAIL).first()
-    print(f"Dashboard → Shop Used: {shop}")
-
+    # ✅ LOW STOCK FIXED TO CURRENT STORE
     low_stock_products = Product.objects.filter(
         storestock__store=shop,
         storestock__quantity__lte=F('reorder_level'),
         is_active=True
     ).distinct()[:5]
 
-    print(f"Dashboard → Low Stock Products: {low_stock_products.count()}")
-
-    top_products_today = SaleItem.objects.filter(sale__in=today_sales).values(
+    top_products_today = SaleItem.objects.filter(
+        sale__in=today_sales
+    ).values(
         'product__name'
-    ).annotate(total_sold=Sum('quantity')).order_by('-total_sold')[:5]
-
-    print(f"Dashboard → Top Products Today Count: {top_products_today.count()}")
-    print("=====================================\n")
+    ).annotate(
+        total_sold=Sum('quantity')
+    ).order_by('-total_sold')[:5]
 
     context = {
         'today_total_sales': today_total_sales,
@@ -117,11 +181,13 @@ def sales_dashboard(request):
         'top_products_today': top_products_today,
         'user_role': getattr(user, 'role', None),
         'today': today,
+        'store': shop,   # ✅ expose store to template
     }
+
     print(context)
+    print("=====================================\n")
+
     return render(request, 'sales/pos_base.html', context)
-
-
 # @login_required
 @login_required(login_url='/account/login/')
 def pos_interface(request):
@@ -352,9 +418,19 @@ def api_create_sale(request):
             product = Product.objects.get(id=item['product_id'])
             quantity = item['quantity']
 
-            InventoryService.remove_stock(
+            # StoreStockService.subtract(
+            #     product=product,
+            #     store=store,
+            #     quantity=quantity,
+            #     user=user,
+            #     reference=f"SALE_{sale.sale_id}",
+            #     remarks=f"Sale: {quantity} units"
+            # )
+
+            StoreStockService.adjust_stock(
                 product=product,
                 store=store,
+                action="subtract",
                 quantity=quantity,
                 user=user,
                 reference=f"SALE_{sale.sale_id}",

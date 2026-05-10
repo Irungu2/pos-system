@@ -1,0 +1,608 @@
+
+# # from django.db import transaction
+# # from django.core.exceptions import ValidationError
+# # from .models import StoreStock
+
+# # from django.db import transaction
+# # from django.core.exceptions import ValidationError
+# # from .models import StoreStock
+
+# # class InventoryService:
+# #     """Inventory operations with proper locking"""
+
+# #     @staticmethod
+# #     def get_store_stock(product, store):
+# #         try:
+# #             store_stock = StoreStock.objects.get(product=product, store=store)
+# #             return store_stock.quantity
+# #         except StoreStock.DoesNotExist:
+# #             return 0
+
+# #     @staticmethod
+# #     @transaction.atomic
+# #     def remove_stock(product, store, quantity, user, reference="", remarks=""):
+# #         from .models import StockTransaction
+
+# #         # 🔒 LOCK the row
+# #         try:
+# #             store_stock = StoreStock.objects.select_for_update().get(
+# #                 product=product,
+# #                 store=store
+# #             )
+# #         except StoreStock.DoesNotExist:
+# #             raise ValidationError(
+# #                 f"No stock record for {product.name} in {store.name}"
+# #             )
+
+# #         # ✅ Safe check AFTER lock
+# #         if store_stock.quantity < quantity:
+# #             raise ValidationError(
+# #                 f"Insufficient stock in {store.name}. "
+# #                 f"Available: {store_stock.quantity}, Requested: {quantity}"
+# #             )
+
+# #         # ✅ Deduct immediately (NO signal dependency)
+# #         store_stock.quantity -= quantity
+# #         store_stock.save()
+
+# #         # Record transaction
+# #         transaction_obj = StockTransaction.objects.create(
+# #             product=product,
+# #             store=store,
+# #             transaction_type=StockTransaction.OUT,
+# #             quantity=quantity,
+# #             performed_by=user,
+# #             reference=reference,
+# #             remarks=remarks
+# #         )
+
+# #         return transaction_obj
+
+# #     @staticmethod
+# #     @transaction.atomic
+# #     def add_stock(product, store, quantity, user, reference="", remarks=""):
+# #         from .models import StockTransaction
+
+# #         # 🔒 LOCK or create
+# #         store_stock, _ = StoreStock.objects.select_for_update().get_or_create(
+# #             product=product,
+# #             store=store,
+# #             defaults={"quantity": 0}
+# #         )
+
+# #         store_stock.quantity += quantity
+# #         store_stock.save()
+
+# #         transaction_obj = StockTransaction.objects.create(
+# #             product=product,
+# #             store=store,
+# #             transaction_type=StockTransaction.IN,
+# #             quantity=quantity,
+# #             performed_by=user,
+# #             reference=reference,
+# #             remarks=remarks
+# #         )
+
+# #         return transaction_obj
+# from django.db import transaction
+# from django.core.exceptions import ValidationError
+# from .models import StoreStock
+
+
+# class InventoryService:
+#     """Inventory operations with proper locking"""
+#     print("in the InventoryService")
+    @staticmethod
+    def get_store_stock(product, store):
+        try:
+            store_stock = StoreStock.objects.get(product=product, store=store)
+            return store_stock.quantity
+        except StoreStock.DoesNotExist:
+            return 0
+
+#     @staticmethod
+#     @transaction.atomic
+#     def set_stock(product, store, quantity):
+#         store_stock, _ = StoreStock.objects.select_for_update().get_or_create(
+#             product=product,
+#             store=store,
+#             defaults={"quantity": 0}
+#         )
+
+#         store_stock.quantity = quantity
+#         store_stock.save()
+
+#         return store_stock
+
+#     @staticmethod
+#     @transaction.atomic
+#     def remove_stock(product, store, quantity, user, reference="", remarks=""):
+#         from .models import StockTransaction
+
+#         try:
+#             store_stock = StoreStock.objects.select_for_update().get(
+#                 product=product,
+#                 store=store
+#             )
+#         except StoreStock.DoesNotExist:
+#             raise ValidationError(
+#                 f"No stock record for {product.name} in {store.name}"
+#             )
+
+#         if store_stock.quantity < quantity:
+#             raise ValidationError(
+#                 f"Insufficient stock in {store.name}. "
+#                 f"Available: {store_stock.quantity}, Requested: {quantity}"
+#             )
+
+#         store_stock.quantity -= quantity
+#         store_stock.save()
+
+#         transaction_obj = StockTransaction.objects.create(
+#             product=product,
+#             store=store,
+#             transaction_type=StockTransaction.OUT,
+#             quantity=quantity,
+#             performed_by=user,
+#             reference=reference,
+#             remarks=remarks
+#         )
+
+#         return transaction_obj
+
+#     @staticmethod
+#     @transaction.atomic
+#     def add_stock(product, store, quantity, user, reference="", remarks=""):
+#         from .models import StockTransaction
+
+#         store_stock, _ = StoreStock.objects.select_for_update().get_or_create(
+#             product=product,
+#             store=store,
+#             defaults={"quantity": 0}
+#         )
+
+#         store_stock.quantity += quantity
+#         store_stock.save()
+
+#         transaction_obj = StockTransaction.objects.create(
+#             product=product,
+#             store=store,
+#             transaction_type=StockTransaction.IN,
+#             quantity=quantity,
+#             performed_by=user,
+#             reference=reference,
+#             remarks=remarks
+#         )
+
+#         return transaction_obj
+
+
+
+# # services/store_stock_service.py
+
+# from django.db import transaction
+# from django.db.models import F
+# from apps.inventory.models import StoreStock, StockTransaction
+
+
+# class StoreStockService:
+
+#     @staticmethod
+#     @transaction.atomic
+#     def adjust_stock(*, stock: StoreStock, action: str, quantity: int, user, notes=""):
+#         print(" am in the store stock service")
+#         """
+#         Central business logic for stock adjustment
+#         """
+
+#         if action == "set":
+#             new_qty = quantity
+#             transaction_type = StockTransaction.IN  # or ADJUST if you prefer
+
+#         elif action == "add":
+#             new_qty = stock.quantity + quantity
+#             transaction_type = StockTransaction.IN
+
+#         elif action == "subtract":
+#             new_qty = max(0, stock.quantity - quantity)
+#             transaction_type = StockTransaction.OUT
+
+#         else:
+#             raise ValueError("Invalid action")
+
+#         # update stock
+#         stock.quantity = new_qty
+#         stock.save()
+
+#         # create transaction log
+#         StockTransaction.objects.create(
+#             product=stock.product,
+#             store=stock.store,
+#             transaction_type=transaction_type,
+#             quantity=quantity,
+#             performed_by=user,
+#             remarks=notes,
+#         )
+
+#         return stock
+
+
+
+
+
+# # class RestockDebugService:
+# #     def __init__(self, restock):
+# #         self.restock = restock
+
+# #     def process(self):
+
+# #         print("\n========== RESTOCK DEBUG START ==========")
+
+# #         # RESTOCK INFO
+# #         print("\n--- RESTOCK INFO ---")
+# #         print("ID:", self.restock.id)
+# #         print("STORE:", getattr(self.restock.store, "name", None))
+# #         print("CATEGORY:", getattr(self.restock, "category_id", None))
+# #         print("NOTES:", getattr(self.restock, "notes", None))
+# #         print("COMPLETED:", getattr(self.restock, "completed", None))
+
+# #         # ITEMS QUERY
+# #         items = self.restock.items.select_related('product').all()
+
+# #         print("\n--- TOTAL ITEMS ---")
+# #         print(items.count())
+
+# #         # LOOP ITEMS
+# #         for i, item in enumerate(items, start=1):
+
+# #             print(f"\n========== ITEM {i} ==========")
+
+# #             print("ITEM ID:", item.id)
+
+# #             print("PRODUCT OBJECT:", item.product)
+# #             print("PRODUCT ID:", getattr(item.product, "id", None))
+# #             print("PRODUCT NAME:", getattr(item.product, "name", None))
+# #             print("SKU:", getattr(item.product, "sku", None))
+# #             print("CATEGORY:", getattr(item.product.category, "name", None) if item.product and item.product.category else None)
+
+# #             print("\n--- STOCK DATA ---")
+# #             print("CURRENT QUANTITY (DB):", item.current_quantity)
+# #             print("NEW QUANTITY (UPLOAD):", item.new_quantity)
+
+# #             print("\n--- PRICE DATA ---")
+# #             print("CURRENT PRICE (DB):", item.current_price)
+# #             print("NEW PRICE (UPLOAD):", item.new_price)
+
+# #             print("\n--- RAW ITEM OBJECT ---")
+# #             print(item)
+
+# #         print("\n========== RESTOCK DEBUG END ==========")
+
+
+# # from .services.store_stock_service import StoreStockService
+
+
+# class RestockDebugService:
+#     def __init__(self, restock):
+#         self.restock = restock
+
+#     def process(self):
+
+#         print("\n========== RESTOCK PROCESS START ==========")
+
+#         print("RESTOCK ID:", self.restock.id)
+#         print("STORE:", self.restock.store.name)
+#         print("NOTES:", self.restock.notes)
+#         print("COMPLETED:", self.restock.completed)
+
+#         items = self.restock.items.select_related("product").all()
+
+#         print("\nTOTAL ITEMS:", items.count())
+
+#         for i, item in enumerate(items, start=1):
+
+#             print(f"\n========== ITEM {i} ==========")
+
+#             product = item.product
+#             store = self.restock.store
+
+#             print("PRODUCT:", product.name)
+#             print("SKU:", product.sku)
+
+#             print("\n--- STOCK INFO ---")
+#             print("CURRENT STORE STOCK:", item.current_quantity)
+#             print("NEW STORE STOCK:", item.new_quantity)
+
+#             print("\n--- PRICE INFO ---")
+#             print("CURRENT PRICE:", product.selling_price)
+#             print("NEW PRICE:", item.new_price)
+
+#             # -----------------------------
+#             # 1. UPDATE STORE STOCK (USING SERVICE)
+#             # -----------------------------
+#             try:
+#                 stock = StoreStock.objects.get_or_create(
+#                     store=store,
+#                     product=product,
+#                     defaults={"quantity": 0}
+#                 )[0]
+
+#                 print("\n--- BEFORE STOCK UPDATE ---")
+#                 print(stock.quantity)
+
+#                 StoreStockService.adjust_stock(
+#                     stock=stock,
+#                     action="set",   # because Excel defines FINAL stock
+#                     quantity=item.new_quantity,
+#                     user=self.restock.completed_by,
+#                     notes=f"Restock #{self.restock.id}"
+#                 )
+
+#                 stock.refresh_from_db()
+
+#                 print("--- AFTER STOCK UPDATE ---")
+#                 print(stock.quantity)
+#                 print("✔ STOCK UPDATED")
+
+#             except Exception as e:
+#                 print("❌ STOCK UPDATE ERROR:", str(e))
+#                 raise
+
+#             # -----------------------------
+#             # 2. UPDATE GLOBAL PRODUCT PRICE
+#             # -----------------------------
+#             try:
+#                 if item.new_price is not None:
+
+#                     print("\n--- BEFORE PRICE UPDATE ---")
+#                     print(product.selling_price)
+
+#                     product.selling_price = item.new_price
+#                     product.save()
+
+#                     print("--- AFTER PRICE UPDATE ---")
+#                     print(product.selling_price)
+#                     print("✔ PRICE UPDATED")
+
+#             except Exception as e:
+#                 print("❌ PRICE UPDATE ERROR:", str(e))
+#                 raise
+
+#         # -----------------------------
+#         # MARK RESTOCK COMPLETE
+#         # -----------------------------
+#         self.restock.completed = True
+#         self.restock.save()
+
+#         print("\n========== RESTOCK PROCESS COMPLETE ==========")
+
+from django.db import transaction
+from django.db.models import F
+from django.core.exceptions import ValidationError
+
+from apps.inventory.models import StoreStock, StockTransaction
+
+
+# class StoreStockService:
+#     """
+#     Single source of truth for ALL stock mutations.
+#     """
+
+#     @staticmethod
+#     @transaction.atomic
+#     def adjust_stock(*, product, store, action: str, quantity: int, user, reference="", remarks=""):
+#         """
+#         Handles all stock operations:
+#         - set
+#         - add
+#         - subtract
+#         """
+
+#         stock, _ = StoreStock.objects.select_for_update().get_or_create(
+#             product=product,
+#             store=store,
+#             defaults={"quantity": 0}
+#         )
+
+#         if action == "set":
+#             new_quantity = quantity
+#             transaction_type = StockTransaction.IN  # or ADJUST if you prefer
+
+#         elif action == "add":
+#             new_quantity = stock.quantity + quantity
+#             transaction_type = StockTransaction.IN
+
+#         elif action == "subtract":
+#             if stock.quantity < quantity:
+#                 raise ValidationError(
+#                     f"Insufficient stock in {store.name}. "
+#                     f"Available: {stock.quantity}, Requested: {quantity}"
+#                 )
+#             new_quantity = stock.quantity - quantity
+#             transaction_type = StockTransaction.OUT
+
+#         else:
+#             raise ValueError("Invalid action. Use: set, add, subtract")
+
+#         # update stock
+#         stock.quantity = new_quantity
+#         stock.save()
+
+#         # log transaction
+#         return StockTransaction.objects.create(
+#             product=product,
+#             store=store,
+#             transaction_type=transaction_type,
+#             quantity=quantity,
+#             performed_by=user,
+#             reference=reference,
+#             remarks=remarks,
+#         )
+
+from django.db import transaction
+from django.core.exceptions import ValidationError
+
+from apps.inventory.models import StoreStock, StockTransaction
+
+
+class StoreStockService:
+    """
+    Single source of truth for ALL stock mutations.
+    Includes full audit trail (before/after stock tracking).
+    """
+
+    @staticmethod
+    @transaction.atomic
+    def adjust_stock(
+        *,
+        product,
+        store,
+        action: str,
+        quantity: int,
+        user,
+        reference="",
+        remarks=""
+    ):
+        """
+        Handles all stock operations:
+        - set
+        - add
+        - subtract
+        """
+
+        stock, _ = StoreStock.objects.select_for_update().get_or_create(
+            product=product,
+            store=store,
+            defaults={"quantity": 0}
+        )
+
+        # -----------------------------
+        # Capture BEFORE state
+        # -----------------------------
+        previous_quantity = stock.quantity
+
+        # -----------------------------
+        # Determine NEW state
+        # -----------------------------
+        if action == "set":
+            new_quantity = quantity
+            transaction_type = StockTransaction.IN  # or ADJUST if you add it
+
+        elif action == "add":
+            new_quantity = stock.quantity + quantity
+            transaction_type = StockTransaction.IN
+
+        elif action == "subtract":
+            if stock.quantity < quantity:
+                raise ValidationError(
+                    f"Insufficient stock in {store.name}. "
+                    f"Available: {stock.quantity}, Requested: {quantity}"
+                )
+            new_quantity = stock.quantity - quantity
+            transaction_type = StockTransaction.OUT
+
+        else:
+            raise ValueError("Invalid action. Use: set, add, subtract")
+
+        # -----------------------------
+        # Update stock (single source of truth)
+        # -----------------------------
+        stock.quantity = new_quantity
+        stock.save()
+
+        # -----------------------------
+        # Create FULL audit transaction
+        # -----------------------------
+        return StockTransaction.objects.create(
+            product=product,
+            store=store,
+            transaction_type=transaction_type,
+            quantity=quantity,
+            previous_quantity=previous_quantity,   # NEW
+            new_quantity=new_quantity,             # NEW
+            performed_by=user,
+            reference=reference,
+            remarks=remarks,
+        )
+
+
+class RestockDebugService:
+    def __init__(self, restock):
+        self.restock = restock
+
+    def process(self):
+
+        print("\n========== RESTOCK PROCESS START ==========")
+
+        print("RESTOCK ID:", self.restock.id)
+        print("STORE:", self.restock.store.name)
+        print("NOTES:", self.restock.notes)
+        print("COMPLETED:", self.restock.completed)
+
+        items = self.restock.items.select_related("product").all()
+
+        print("\nTOTAL ITEMS:", items.count())
+
+        for i, item in enumerate(items, start=1):
+
+            print(f"\n========== ITEM {i} ==========")
+
+            product = item.product
+            store = self.restock.store
+
+            print("PRODUCT:", product.name)
+            print("SKU:", product.sku)
+
+            print("\n--- STOCK INFO ---")
+            print("TARGET STOCK:", item.new_quantity)
+
+            print("\n--- PRICE INFO ---")
+            print("NEW PRICE:", item.new_price)
+
+            # -----------------------------
+            # 1. UPDATE STOCK (SINGLE SOURCE OF TRUTH)
+            # -----------------------------
+            try:
+                print("\n--- STOCK UPDATE ---")
+
+                StoreStockService.adjust_stock(
+                    product=product,
+                    store=store,
+                    action="add",
+                    quantity=item.new_quantity,
+                    user=self.restock.completed_by,
+                    notes=f"Restock #{self.restock.id}"
+                )
+
+                print("✔ STOCK UPDATED")
+
+            except Exception as e:
+                print("❌ STOCK UPDATE ERROR:", str(e))
+                raise
+
+            # -----------------------------
+            # 2. UPDATE PRODUCT PRICE
+            # -----------------------------
+            try:
+                if item.new_price is not None:
+
+                    print("\n--- PRICE UPDATE ---")
+                    print("CURRENT:", product.selling_price)
+
+                    product.selling_price = item.new_price
+                    product.save()
+
+                    print("NEW:", product.selling_price)
+                    print("✔ PRICE UPDATED")
+
+            except Exception as e:
+                print("❌ PRICE UPDATE ERROR:", str(e))
+                raise
+
+        # -----------------------------
+        # MARK RESTOCK COMPLETE
+        # -----------------------------
+        self.restock.completed = True
+        self.restock.save()
+
+        print("\n========== RESTOCK PROCESS COMPLETE ==========")
