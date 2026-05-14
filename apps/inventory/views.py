@@ -1497,7 +1497,7 @@ def inventory_summary(request):
 
 
 @method_decorator(csrf_exempt, name='dispatch')
-class BulkRestockViewSet(viewsets.ModelViewSet):
+class BulkRestockXlsViewSet(viewsets.ModelViewSet):
     serializer_class = BulkRestockSerializer
     queryset = BulkRestock.objects.all().select_related('store', 'category')
 
@@ -1510,7 +1510,7 @@ class BulkRestockViewSet(viewsets.ModelViewSet):
             "stores": Store.objects.all(),
             "categories": Category.objects.all(),
         }
-        return render(request, 'inventory/bulk_restock.html', context)
+        # return render(request, 'inventory/bulk_restock.html', context)
 
     # ---------------------------------------------------
     # 2. GENERATE RESTOCK EXCEL TEMPLATE
@@ -1584,17 +1584,26 @@ class BulkRestockViewSet(viewsets.ModelViewSet):
             )
             items_created += 1
 
+            # products_data.append({
+            #     'ID': product.id,
+            #     'Product': product.name,
+            #     'SKU': product.sku,
+            #     'Category': product.category.name if product.category else '',
+            #     'Current Stock': current_qty,
+            #     'Reorder Level': product.reorder_level,
+            #     'New Stock': current_qty,  # User will update this
+            #     'Current Price': float(product.selling_price),
+            #     'New Price': float(product.selling_price),  # User can update this
+            #     'Restock ID': restock.id  # For reference
+            # })
+
             products_data.append({
-                'ID': product.id,
                 'Product': product.name,
-                'SKU': product.sku,
                 'Category': product.category.name if product.category else '',
                 'Current Stock': current_qty,
-                'Reorder Level': product.reorder_level,
-                'New Stock': current_qty,  # User will update this
                 'Current Price': float(product.selling_price),
-                'New Price': float(product.selling_price),  # User can update this
-                'Restock ID': restock.id  # For reference
+                'New Stock': '',
+                'New Price': ''
             })
 
         if not products_data:
@@ -2204,6 +2213,9 @@ class BulkRestockViewSet(viewsets.ModelViewSet):
                 {'error': f'Processing error: {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+   
+
+
     # ---------------------------------------------------
     # 4. QUICK RESTOCK OPTIONS
     # ---------------------------------------------------

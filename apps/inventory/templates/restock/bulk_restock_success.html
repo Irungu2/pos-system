@@ -1,0 +1,294 @@
+{% extends "inventory/inventory_base.html" %}
+{% load static %}
+
+{% block title %}Restock Successful{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="success-container">
+        <div class="success-icon">
+            ✓
+        </div>
+        
+        <h1>Restock Completed Successfully!</h1>
+        
+        <p class="success-message">
+            The bulk restock has been processed and inventory has been updated.
+        </p>
+        
+        <div class="success-card">
+            <h3>Restock Summary</h3>
+            <div class="summary-row">
+                <span class="label">Restock ID:</span>
+                <span class="value" id="restock-id">Loading...</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">Store:</span>
+                <span class="value" id="store-name">Loading...</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">Status:</span>
+                <span class="value" id="status">Loading...</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">Total Items:</span>
+                <span class="value" id="total-items">Loading...</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">Total Quantity:</span>
+                <span class="value" id="total-quantity">Loading...</span>
+            </div>
+            <div class="summary-row highlight">
+                <span class="label">Total Value:</span>
+                <span class="value" id="total-value">Loading...</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">Processed By:</span>
+                <span class="value" id="processed-by">Loading...</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">Processed At:</span>
+                <span class="value" id="processed-at">Loading...</span>
+            </div>
+        </div>
+        
+        <div class="action-buttons">
+            <a href="{% url 'inventory:bulk_restock_page1' %}" class="btn-primary">
+                ← Back to Restocks List
+            </a>
+            <a href="#" id="print-summary-btn" class="btn-secondary">
+                🖨️ Print Summary
+            </a>
+            <a href="#" id="new-restock-btn" class="btn-success">
+                + New Restock
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay" style="display: none;">
+    <div class="spinner"></div>
+</div>
+
+<script src="{% static 'js/restock/bulk_restock_success.js' %}"></script>
+
+<style>
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+.success-container {
+    text-align: center;
+}
+
+.success-icon {
+    width: 80px;
+    height: 80px;
+    background: #28a745;
+    color: white;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    margin-bottom: 20px;
+    animation: scaleIn 0.5s ease-out;
+}
+
+@keyframes scaleIn {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+h1 {
+    color: #28a745;
+    margin-bottom: 10px;
+    animation: fadeInUp 0.5s ease-out;
+}
+
+.success-message {
+    color: #666;
+    font-size: 16px;
+    margin-bottom: 30px;
+    animation: fadeInUp 0.5s ease-out 0.1s both;
+}
+
+.success-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 30px;
+    text-align: left;
+    animation: fadeInUp 0.5s ease-out 0.2s both;
+}
+
+.success-card h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #007bff;
+    color: #333;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.summary-row.highlight {
+    background: #e8f4f8;
+    padding: 12px;
+    margin: 5px 0;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+.summary-row .label {
+    font-weight: bold;
+    color: #666;
+}
+
+.summary-row .value {
+    color: #333;
+}
+
+.summary-row.highlight .value {
+    color: #007bff;
+    font-size: 18px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    animation: fadeInUp 0.5s ease-out 0.3s both;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 14px;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 14px;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 14px;
+}
+
+.btn-success:hover {
+    background: #218838;
+}
+
+/* Loading Overlay */
+#loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #007bff;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Print Styles */
+@media print {
+    .action-buttons,
+    .btn-primary,
+    .btn-secondary,
+    .btn-success {
+        display: none;
+    }
+    
+    .success-container {
+        padding: 0;
+    }
+    
+    .success-card {
+        break-inside: avoid;
+    }
+}
+
+@media (max-width: 768px) {
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .action-buttons a {
+        width: 100%;
+        text-align: center;
+    }
+}
+</style>
+{% endblock %}

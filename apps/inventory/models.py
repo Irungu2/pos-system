@@ -446,6 +446,19 @@ class StockTransfer(models.Model):
 # bulk 
 
 class BulkRestock(models.Model):
+    STATUS_CHOICES = [
+        ("draft", "Draft"),
+        ("editing", "Editing"),
+        ("reviewed", "Reviewed"),
+        ("processing", "Processing"),
+        ("completed", "Completed"),
+    ]
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="draft"
+    ) 
     store = models.ForeignKey("inventory.Store", on_delete=models.CASCADE, related_name="bulk_restocks")
     category = models.ForeignKey("inventory.Category", on_delete=models.SET_NULL, null=True, blank=True)
     completed_by = models.ForeignKey("account.User",on_delete=models.SET_NULL,null=True,blank=True,related_name="created_bulk_restock")
@@ -465,37 +478,6 @@ class BulkRestock(models.Model):
     def items_count(self):
         return self.items.count()
     
-    # @transaction.atomic
-    # def process_restock(self):
-    #     """Process the restock - update all items with new quantities"""
-    #     for item in self.items.all():
-    #         # Update store stock
-    #         store_stock, created = StoreStock.objects.get_or_create(
-    #             store=self.store,
-    #             product=item.product,
-    #             defaults={'quantity': item.new_quantity}
-    #         )
-            
-    #         if not created:
-    #             store_stock.quantity = item.new_quantity
-    #             store_stock.save()
-            
-    #         # Create stock transaction
-    #         StockTransaction.objects.create(
-    #             product=item.product,
-    #             store=self.store,
-    #             transaction_type=StockTransaction.IN,
-    #             quantity=item.new_quantity - item.current_quantity,
-    #             remarks=f"Bulk restock from Excel",
-    #             performed_by=None,  # Can be set when processing
-    #             reference=f"BULK-{self.id}"
-    #         )
-        
-    #     self.completed = True
-    #     self.completed_at = timezone.now()
-    #     self.save()
-    #     return True
-
 
 class BulkRestockItem(models.Model):
     restock = models.ForeignKey(BulkRestock, on_delete=models.CASCADE, related_name="items")

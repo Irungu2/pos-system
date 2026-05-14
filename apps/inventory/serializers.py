@@ -417,3 +417,147 @@ class GenerateTemplateSerializer(serializers.Serializer):
 
 class UploadCompletedSerializer(serializers.Serializer):
     file = serializers.FileField(required=True)
+
+
+
+
+
+
+
+
+# serializers.py
+
+from rest_framework import serializers
+from .models import BulkRestock, BulkRestockItem, Product, StoreStock
+from decimal import Decimal
+
+class BulkRestockItemCreateSerializer(serializers.Serializer):
+    """Serializer for creating/updating bulk restock items"""
+    product_id = serializers.IntegerField()
+    current_quantity = serializers.IntegerField(read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    new_quantity = serializers.IntegerField(required=False, allow_null=True)
+    new_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+
+class BulkRestockItemUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for updating individual items during editing phase"""
+    class Meta:
+        model = BulkRestockItem
+        fields = ['id', 'new_quantity', 'new_price']
+    
+    def validate_new_quantity(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError("Quantity cannot be negative")
+        return value
+    
+    def validate_new_price(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError("Price cannot be negative")
+        return value
+
+class BulkRestockItemResponseSerializer(serializers.ModelSerializer):
+    """Full item response with computed fields"""
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    product_sku = serializers.CharField(source='product.sku', read_only=True)
+    product_category = serializers.CharField(source='product.category.name', read_only=True)
+    quantity_change = serializers.IntegerField(read_only=True)
+    price_change = serializers.SerializerMethodField()
+    total_cost_increase = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = BulkRestockItem
+        fields = [
+            'id', 'product', 'product_name', 'product_sku', 'product_category',
+            'current_quantity', 'new_quantity', 'quantity_change',
+            'current_price', 'new_price', 'price_change', 'total_cost_increase'
+        ]
+        read_only_fields = ['id']
+    
+    def get_price_change(self, obj):
+        if obj.new_price and obj.current_price:
+            return float(obj.new_price - obj.current_price)
+        return 0
+    
+    def get_total_cost_increase(self, obj):
+        if obj.new_quantity and obj.new_price and obj.current_quantity and obj.current_price:
+            new_total = obj.new_quantity * obj.new_price
+            current_total = obj.current_quantity * obj.current_price
+            return float(new_total - current_total)
+        return 0
+
+class BulkRestockDetailSerializer(serializers.ModelSerializer):
+    """Detailed serializer for bulk restock including items"""
+    items = BulkRestockItemResponseSerializer(many=True, read_only=True)
+    store_name = serializers.CharField(source='store.name', read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    completed_by_name = serializers.CharField(source='completed_by.get_full_name', read_only=True)
+    total_items = serializers.IntegerField(source='items_count', read_only=True)
+    total_quantity_increase = serializers.SerializerMethodField()
+    total_value_increase = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = BulkRestock
+        fields = [
+            'id', 'store', 'store_name', 'category', 'category_name',
+            'include_all', 'status', 'generated_at', 'completed', 'completed_at',
+            'completed_by', 'completed_by_name', 'notes', 'total_items',
+            'items', 'total_quantity_increase', 'total_value_increase'
+        ]
+        read_only_fields = ['id', 'generated_at', 'completed', 'completed_at', 'total_items']
+    
+    def get_total_quantity_increase(self, obj):
+        return sum(item.quantity_change for item in obj.items.all())
+    
+    def get_total_value_increase(self, obj):
+        return sum(
+            (item.new_quantity * (item.new_price or item.current_price)) - 
+            (item.current_quantity * item.current_price)
+            for item in obj.items.all()
+        )
+
+class BulkRestockCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating a bulk restock draft"""
+    items = BulkRestockItemCreateSerializer(many=True, write_only=True)
+    
+    class Meta:
+        model = BulkRestock
+        fields = ['store', 'category', 'notes', 'items']
+    
+    def validate(self, data):
+        if not data.get('items'):
+            raise serializers.ValidationError("At least one item must be selected")
+        return data
+    
+    def create(self, validated_data):
+        items_data = validated_data.pop('items', [])
+        validated_data['status'] = 'draft'
+        restock = BulkRestock.objects.create(**validated_data)
+        
+        # Create items for selected products
+        for item_data in items_data:
+            product_id = item_data['product_id']
+            product = Product.objects.get(id=product_id)
+            
+            # Get current stock from selected store
+            store_stock = StoreStock.objects.filter(
+                store=restock.store,
+                product=product
+            ).first()
+            
+            current_quantity = store_stock.quantity if store_stock else 0
+            current_price = product.selling_price
+            
+            # Use provided new values or default to current
+            new_quantity = item_data.get('new_quantity', current_quantity)
+            new_price = item_data.get('new_price', current_price)
+            
+            BulkRestockItem.objects.create(
+                restock=restock,
+                product=product,
+                current_quantity=current_quantity,
+                new_quantity=new_quantity if new_quantity is not None else current_quantity,
+                current_price=current_price,
+                new_price=new_price if new_price is not None else current_price
+            )
+        
+        return restock
