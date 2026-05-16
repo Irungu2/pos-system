@@ -1,565 +1,551 @@
 {% extends "inventory/inventory_base.html" %}
 {% load static %}
 
-{% block title %}Create Bulk Restock{% endblock %}
+{% block title %}
+Create Bulk Restock
+{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="page-header">
-        <h2>Create Bulk Restock</h2>
-        <div class="header-actions">
-            <a href="{% url 'inventory:bulk_restock_page1' %}" class="btn-secondary">
-                ← Back to List
-            </a>
-        </div>
-    </div>
-
-    <!-- Wizard Steps -->
-    <div class="wizard-steps">
-        <div class="step active">
-            <div class="step-number">1</div>
-            <div class="step-label">Select Store & Products</div>
-        </div>
-        <div class="step">
-            <div class="step-number">2</div>
-            <div class="step-label">Review & Submit</div>
-        </div>
-        <div class="step">
-            <div class="step-number">3</div>
-            <div class="step-label">Process</div>
-        </div>
-    </div>
-
-    <!-- Store Selection -->
-    <div class="store-selection-section">
-        <div class="form-group">
-            <label for="store-select">Select Store <span class="required">*</span></label>
-            <select id="store-select" class="form-control">
-                <option value="">-- Select Store --</option>
-                {% for store in stores %}
-                <option value="{{ store.id }}">{{ store.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-    </div>
-
-    <!-- Products Section (hidden until store selected) -->
-    <div id="products-section" style="display: none;">
-        <!-- Filters -->
-        <div class="filters-container">
-            <div class="filter-row">
-                <div class="filter-group">
-                    <label>Category</label>
-                    <select id="filter-category">
-                        <option value="">All Categories</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>Stock Status</label>
-                    <select id="filter-stock-status">
-                        <option value="all">All</option>
-                        <option value="low_stock">Low Stock</option>
-                        <option value="out_of_stock">Out of Stock</option>
-                        <option value="in_stock">In Stock</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>Search</label>
-                    <input type="text" id="filter-search" placeholder="Search by name or SKU...">
-                </div>
-                <div class="filter-group">
-                    <button id="apply-filters" class="btn-secondary">Apply Filters</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Products Table -->
-        <div class="products-section">
-            <div class="section-header">
-                <h3>Available Products</h3>
-                <div class="selection-actions">
-                    <button id="select-all" class="btn-sm">Select All</button>
-                    <button id="clear-all" class="btn-sm">Clear All</button>
-                </div>
-            </div>
-
-            <div id="products-table-container">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th width="50">
-                                <input type="checkbox" id="select-all-checkbox">
-                            </th>
-                            <th>SKU</th>
-                            <th>Product Name</th>
-                            <th>Category</th>
-                            <th>Current Stock</th>
-                            <th>Reorder Level</th>
-                            <th>Stock Status</th>
-                            <th>Selling Price</th>
-                            <th width="120">Restock Quantity</th>
-                        </tr>
-                    </thead>
-                    <tbody id="products-table-body">
-                        <tr>
-                            <td colspan="9" class="loading">Select a store to view products...</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Pagination -->
-            <div id="pagination" class="pagination-container"></div>
-        </div>
-
-        <!-- Selected Products Summary -->
-        <div class="selected-products-section">
-            <div class="section-header">
-                <h3>Selected Products (<span id="selected-count">0</span>)</h3>
-            </div>
-            <div id="selected-products-list">
-                <div class="empty-selected">No products selected yet</div>
-            </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="action-buttons">
-            <button id="create-draft-btn" class="btn-primary" disabled>
-                Create Restock Draft
-            </button>
-            <button id="cancel-btn" class="btn-secondary">
-                Cancel
-            </button>
-        </div>
-    </div>
-</div>
-
-<!-- Loading Overlay -->
-<div id="loading-overlay" style="display: none;">
-    <div class="spinner"></div>
-</div>
-
-<script src="{% static 'js/restock/bulk_restock_create.js' %}"></script>
 
 <style>
-/* General Styles */
 .container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 20px;
+    width: 100%;
+    max-width: 100%;
 }
+
+/* ================= HEADER ================= */
 
 .page-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 30px;
+    margin-bottom: 24px;
 }
 
-.header-actions a {
-    padding: 8px 16px;
-    border-radius: 6px;
-    text-decoration: none;
+.page-header h2 {
+    margin: 0;
 }
 
-/* Wizard Steps */
+/* ================= WIZARD ================= */
+
 .wizard-steps {
     display: flex;
-    justify-content: space-between;
-    margin-bottom: 40px;
-    background: #f8f9fa;
-    padding: 20px;
-    border-radius: 8px;
+    gap: 24px;
+    margin-bottom: 30px;
 }
 
 .step {
-    flex: 1;
-    text-align: center;
-    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    opacity: 0.5;
 }
 
-.step:not(:last-child):after {
-    content: '';
-    position: absolute;
-    top: 20px;
-    right: -50%;
-    width: 100%;
-    height: 2px;
-    background: #dee2e6;
-    z-index: 1;
-}
-
-.step.active .step-number {
-    background: #007bff;
-    color: white;
-    border-color: #007bff;
-}
-
-.step.completed .step-number {
-    background: #28a745;
-    color: white;
-    border-color: #28a745;
+.step.active {
+    opacity: 1;
+    font-weight: 600;
 }
 
 .step-number {
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
-    background: white;
-    border: 2px solid #dee2e6;
-    display: inline-flex;
+    background: #0d6efd;
+    color: white;
+    display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: bold;
-    position: relative;
-    z-index: 2;
-    background: white;
 }
 
-.step-label {
-    margin-top: 10px;
-    font-size: 14px;
-    color: #666;
-}
+/* ================= STORE ================= */
 
-.step.active .step-label {
-    color: #007bff;
-    font-weight: bold;
-}
-
-/* Store Selection */
 .store-selection-section {
-    background: #f8f9fa;
+    background: #fff;
     padding: 20px;
     border-radius: 8px;
-    margin-bottom: 30px;
-}
-
-.form-group {
-    margin-bottom: 15px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: bold;
-}
-
-.form-group select {
-    width: 100%;
-    max-width: 400px;
-    padding: 10px;
+    margin-bottom: 24px;
     border: 1px solid #ddd;
-    border-radius: 4px;
+}
+
+/* ================= FILTERS ================= */
+
+.filters-container {
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 24px;
+    border: 1px solid #ddd;
+}
+
+.filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: end;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    min-width: 200px;
+}
+
+.filter-group label {
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+/* ================= WORKSPACE ================= */
+
+.workspace {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    width: 100%;
+}
+
+/* ================= PANELS ================= */
+
+.products-panel,
+.selected-panel {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    width: 100%;
+}
+
+/* ================= SECTION HEADER ================= */
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.selection-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* ================= TABLE ================= */
+
+.table-responsive {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+    text-align: left;
+}
+
+.data-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+}
+
+.data-table tbody tr:hover {
+    background: #fafafa;
+}
+
+/* ================= SELECTED TABLE ================= */
+
+#selected-products-list table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#selected-products-list th,
+#selected-products-list td {
+    padding: 10px;
+    border: 1px solid #eee;
+}
+
+.empty-selection {
+    padding: 20px;
+    text-align: center;
+    color: #777;
+}
+
+/* ================= BUTTONS ================= */
+
+button,
+.btn-secondary,
+.btn-sm {
+    border: none;
+    cursor: pointer;
+    border-radius: 6px;
+}
+
+button {
+    padding: 10px 18px;
+}
+
+.btn-secondary {
+    padding: 10px 16px;
+    background: #f1f1f1;
+    text-decoration: none;
+    color: #333;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    background: #f1f1f1;
+}
+
+#create-draft-btn {
+    background: #0d6efd;
+    color: white;
+}
+
+#create-draft-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ================= FORMS ================= */
+
+.form-control,
+input,
+select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
 }
 
 .required {
     color: red;
 }
 
-/* Filters */
-.filters-container {
-    background: #f8f9fa;
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-}
+/* ================= ACTION BAR ================= */
 
-.filter-row {
+.action-bar {
     display: flex;
-    gap: 15px;
-    flex-wrap: wrap;
-    align-items: flex-end;
+    gap: 12px;
+    margin-top: 24px;
 }
 
-.filter-group {
-    flex: 1;
-    min-width: 150px;
-}
+/* ================= PAGINATION ================= */
 
-.filter-group label {
-    display: block;
-    font-size: 12px;
-    font-weight: bold;
-    margin-bottom: 5px;
-}
-
-.filter-group select,
-.filter-group input {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-/* Products Section */
-.products-section {
-    margin-bottom: 30px;
-}
-
-.section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid #007bff;
-}
-
-.selection-actions {
-    display: flex;
-    gap: 10px;
-}
-
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: white;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.data-table th,
-.data-table td {
-    padding: 12px;
-    text-align: left;
-    border-bottom: 1px solid #eee;
-}
-
-.data-table th {
-    background: #f8f9fa;
-    font-weight: bold;
-    position: sticky;
-    top: 0;
-}
-
-.data-table tbody tr:hover {
-    background: #f8f9fa;
-}
-
-.quantity-input {
-    width: 80px;
-    padding: 6px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    text-align: center;
-}
-
-.quantity-input:focus {
-    outline: none;
-    border-color: #007bff;
-}
-
-.stock-badge {
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    display: inline-block;
-}
-
-.stock-low {
-    background: #ffc107;
-    color: #333;
-}
-
-.stock-out {
-    background: #dc3545;
-    color: white;
-}
-
-.stock-in {
-    background: #28a745;
-    color: white;
-}
-
-/* Selected Products Section */
-.selected-products-section {
-    background: #f8f9fa;
-    padding: 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-}
-
-.empty-selected {
-    text-align: center;
-    padding: 40px;
-    color: #999;
-}
-
-.selected-product-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-    border-bottom: 1px solid #dee2e6;
-    background: white;
-    margin-bottom: 5px;
-    border-radius: 4px;
-}
-
-.selected-product-info {
-    flex: 1;
-}
-
-.selected-product-name {
-    font-weight: bold;
-}
-
-.selected-product-sku {
-    font-size: 12px;
-    color: #666;
-    margin-left: 10px;
-}
-
-.selected-product-details {
-    display: flex;
-    gap: 20px;
-    align-items: center;
-}
-
-.selected-quantity {
-    width: 80px;
-    padding: 6px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    text-align: center;
-}
-
-.remove-item-btn {
-    background: #dc3545;
-    color: white;
-    border: none;
-    padding: 4px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.remove-item-btn:hover {
-    background: #c82333;
-}
-
-/* Action Buttons */
-.action-buttons {
-    display: flex;
-    gap: 15px;
-    justify-content: flex-end;
-    padding-top: 20px;
-    border-top: 1px solid #dee2e6;
-}
-
-.btn-primary {
-    background: #007bff;
-    color: white;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-}
-
-.btn-primary:hover:not(:disabled) {
-    background: #0056b3;
-}
-
-.btn-primary:disabled {
-    background: #6c757d;
-    cursor: not-allowed;
-}
-
-.btn-secondary {
-    background: #6c757d;
-    color: white;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-block;
-    font-size: 14px;
-}
-
-.btn-secondary:hover {
-    background: #5a6268;
-}
-
-.btn-sm {
-    padding: 4px 12px;
-    background: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-}
-
-.btn-sm:hover {
-    background: #0056b3;
-}
-
-/* Pagination */
 .pagination-container {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
     margin-top: 20px;
 }
 
-.pagination-btn {
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    background: white;
-    cursor: pointer;
-    border-radius: 4px;
-}
+/* ================= LOADING ================= */
 
-.pagination-btn:hover:not(:disabled) {
-    background: #007bff;
-    color: white;
-    border-color: #007bff;
-}
-
-.pagination-btn.active {
-    background: #007bff;
-    color: white;
-    border-color: #007bff;
-}
-
-.pagination-btn:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-/* Loading Overlay */
 #loading-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    z-index: 9999;
+    inset: 0;
+    background: rgba(255,255,255,0.6);
     display: flex;
     justify-content: center;
     align-items: center;
+    z-index: 9999;
 }
 
 .spinner {
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #007bff;
+    width: 50px;
+    height: 50px;
+    border: 5px solid #ddd;
+    border-top: 5px solid #0d6efd;
     border-radius: 50%;
-    width: 40px;
-    height: 40px;
     animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.loading, .empty, .error {
-    text-align: center;
-    padding: 40px;
-    color: #666;
+    to {
+        transform: rotate(360deg);
+    }
 }
 </style>
+
+<div class="container">
+
+    <!-- ================= HEADER ================= -->
+
+    <div class="page-header">
+
+        <h2>Create Bulk Restock</h2>
+
+        <div class="header-actions">
+            <a href="{% url 'inventory:bulk_restock_page1' %}"
+               class="btn-secondary">
+
+                ← Back to List
+
+            </a>
+        </div>
+
+    </div>
+
+    <!-- ================= WIZARD ================= -->
+
+    <div class="wizard-steps">
+
+        <div class="step active">
+            <div class="step-number">1</div>
+            <div class="step-label">
+                Select Store & Products
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-label">
+                Review & Submit
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-label">
+                Process
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ================= STORE ================= -->
+
+    <div class="store-selection-section">
+
+        <div class="form-group">
+
+            <label for="store-select">
+                Select Store
+                <span class="required">*</span>
+            </label>
+
+            <select id="store-select" class="form-control">
+
+                <option value="">
+                    -- Select Store --
+                </option>
+
+                {% for store in stores %}
+                    <option value="{{ store.id }}">
+                        {{ store.name }}
+                    </option>
+                {% endfor %}
+
+            </select>
+
+        </div>
+
+    </div>
+
+    <!-- ================= PRODUCTS SECTION ================= -->
+
+    <div id="products-section" style="display:none;">
+
+        <!-- FILTERS -->
+
+        <div class="filters-container">
+
+            <div class="filter-row">
+
+                <div class="filter-group">
+
+                    <label>Category</label>
+
+                    <select id="filter-category">
+
+                        <option value="">
+                            All Categories
+                        </option>
+
+                        {% for cat in categories %}
+                            <option value="{{ cat.id }}">
+                                {{ cat.name }}
+                            </option>
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+                <div class="filter-group">
+
+                    <label>Stock Status</label>
+
+                    <select id="filter-stock-status">
+                        <option value="all">All</option>
+                        <option value="low">Low Stock</option>
+                        <option value="out">Out of Stock</option>
+                        <option value="ok">In Stock</option>
+                    </select>
+
+                </div>
+
+                <div class="filter-group">
+
+                    <label>Search</label>
+
+                    <input type="text"
+                           id="filter-search"
+                           placeholder="Search by name or SKU...">
+
+                </div>
+
+                <div class="filter-group">
+
+                    <button id="apply-filters"
+                            class="btn-secondary">
+
+                        Apply Filters
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- ================= WORKSPACE ================= -->
+
+        <div class="workspace">
+
+            <!-- PRODUCTS PANEL -->
+
+            <div class="products-panel">
+
+                <div class="section-header">
+
+                    <h3>Available Products</h3>
+
+                    <div class="selection-actions">
+
+                        <button id="select-all"
+                                class="btn-sm">
+
+                            Select All
+
+                        </button>
+
+                        <button id="clear-all"
+                                class="btn-sm">
+
+                            Clear All
+
+                        </button>
+
+                        <label>
+
+                            <input type="checkbox"
+                                   id="select-all-checkbox">
+
+                            Select All Visible
+
+                        </label>
+
+                    </div>
+
+                </div>
+
+                <div class="table-responsive">
+
+                    <table class="data-table">
+
+                        <thead>
+
+                            <tr>
+                                <th width="50"></th>
+                                <th>SKU</th>
+                                <th>Name</th>
+                                <th>Category</th>
+                                <th>Stock</th>
+                                <th>Reorder</th>
+                                <th>Status</th>
+                                <th>Price</th>
+                                <th>Qty</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody id="products-table-body">
+
+                            <tr>
+                                <td colspan="100%"
+                                    class="loading">
+
+                                    Select a store to view products...
+
+                                </td>
+                            </tr>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+                <div id="pagination"
+                     class="pagination-container"></div>
+
+            </div>
+
+            <!-- SELECTED PRODUCTS PANEL -->
+
+            <div class="selected-panel">
+
+                <div class="section-header">
+
+                    <h3>
+                        Selected Products
+                        (<span id="selected-count">0</span>)
+                    </h3>
+
+                </div>
+
+                <div id="selected-products-list">
+
+                    <div class="empty-selection">
+                        No products selected
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- ================= ACTIONS ================= -->
+
+        <div class="action-bar">
+
+            <button id="create-draft-btn" disabled>
+                Create Restock Draft
+            </button>
+
+            <button id="cancel-btn">
+                Cancel
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ================= LOADING ================= -->
+
+<div id="loading-overlay" style="display:none;">
+    <div class="spinner"></div>
+</div>
+
+<!-- ================= SCRIPT ================= -->
+
+<script src="{% static 'js/restock/bulk_restock_create1.js' %}"></script>
+
 {% endblock %}
