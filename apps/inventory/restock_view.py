@@ -208,110 +208,196 @@ class BulkRestockEditPageView(LoginRequiredMixin, TemplateView):
         print(f"\n[HTTP GET] BulkRestockEditPageView - Loading edit page for restock {self.kwargs['pk']}")
         return super().get(request, *args, **kwargs)
 
-
 class BulkRestockReviewPageView(LoginRequiredMixin, TemplateView):
     """Step 4: Summary review"""
-    template_name = "restock/bulk_restock_review.html"
     
+    template_name = "restock/bulk_restock_review.html"
+
     def get_context_data(self, **kwargs):
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("[PAGE VIEW] BulkRestockReviewPageView - START")
-        print("="*60)
-        
+        print("=" * 60)
+
         context = super().get_context_data(**kwargs)
+
         restock_id = self.kwargs['pk']
         context['restock_id'] = restock_id
-        
+
         print(f"[DEBUG] User: {self.request.user.first_name if self.request.user else 'Anonymous'}")
         print(f"[DEBUG] Restock ID: {restock_id}")
-        
-        # Fetch restock details for review
+
         try:
-            restock = BulkRestock.objects.select_related('store', 'completed_by').prefetch_related('items__product').get(id=restock_id)
-            print(f"[DEBUG] Restock found - Status: {restock.status}, Store: {restock.store.name}")
-            
-            # Check if restock is ready for review
+            # Fetch restock details
+            restock = (
+                BulkRestock.objects
+                .select_related('store', 'completed_by')
+                .prefetch_related('items__product')
+                .get(id=restock_id)
+            )
+
+            print(
+                f"[DEBUG] Restock found - "
+                f"Status: {restock.status}, "
+                f"Store: {restock.store.name}"
+            )
+
+            # Status checks
             if restock.completed:
                 print(f"[WARNING] Restock {restock_id} is already completed")
+
                 context['can_submit'] = False
-                context['warning_message'] = "This restock has already been processed."
+                context['warning_message'] = (
+                    "This restock has already been processed."
+                )
+
             elif restock.status == 'draft':
-                print(f"[INFO] Restock is in draft status - needs to be submitted for review")
+                print("[INFO] Restock is in draft status")
+
                 context['can_submit'] = True
                 context['needs_submit'] = True
-                context['info_message'] = "Please review and submit for final processing."
+                context['info_message'] = (
+                    "Please review and submit for final processing."
+                )
+
             elif restock.status == 'pending_review':
-                print(f"[INFO] Restock is pending review - ready for processing")
+                print("[INFO] Restock pending review")
+
                 context['can_submit'] = True
                 context['needs_submit'] = False
-                context['info_message'] = "Ready to process stock update."
+                context['info_message'] = (
+                    "Ready to process stock update."
+                )
+
             elif restock.status == 'approved':
-                print(f"[INFO] Restock is approved - can be processed")
+                print("[INFO] Restock approved")
+
                 context['can_submit'] = True
                 context['needs_submit'] = False
-                context['info_message'] = "Ready to process stock update."
+                context['info_message'] = (
+                    "Ready to process stock update."
+                )
+
             else:
-                print(f"[WARNING] Restock in status '{restock.status}' cannot be reviewed")
+                print(
+                    f"[WARNING] Invalid review status: {restock.status}"
+                )
+
                 context['can_submit'] = False
-                context['warning_message'] = f"Cannot review restock in '{restock.status}' status."
-            
-            # Calculate summary statistics for display
+                context['warning_message'] = (
+                    f"Cannot review restock in "
+                    f"'{restock.status}' status."
+                )
+
+            # ---------------------------------------------------
+            # FIXED CALCULATIONS
+            # ---------------------------------------------------
+
             items = restock.items.select_related('product')
-            total_quantity_increase = sum(item.quantity_change for item in items)
-            total_current_value = sum(item.current_quantity * item.current_price for item in items)
-            total_new_value = sum(
-                item.new_quantity * (item.new_price or item.current_price)
+
+            # Quantity being added
+            total_quantity_increase = sum(
+                item.new_quantity or 0
                 for item in items
             )
-            total_value_increase = total_new_value - total_current_value
-            
+
+            # Current inventory value
+            total_current_value = sum(
+                (item.current_quantity or 0)
+                * (item.current_price or 0)
+                for item in items
+            )
+
+            # Final inventory value after adding stock
+            total_new_value = sum(
+                (
+                    (item.current_quantity or 0)
+                    + (item.new_quantity or 0)
+                ) * (
+                    item.new_price
+                    or item.current_price
+                    or 0
+                )
+                for item in items
+            )
+
+            # Difference in value
+            total_value_increase = (
+                total_new_value - total_current_value
+            )
+
+            # Final quantities after restock
+            total_final_quantity = sum(
+                (item.current_quantity or 0)
+                + (item.new_quantity or 0)
+                for item in items
+            )
+
+            # Save into context
             context['total_items'] = items.count()
             context['total_quantity_increase'] = total_quantity_increase
             context['total_current_value'] = total_current_value
             context['total_new_value'] = total_new_value
             context['total_value_increase'] = total_value_increase
-            
-            print(f"[DEBUG] Review summary:")
-            print(f"  - Total items: {items.count()}")
-            print(f"  - Quantity increase: {total_quantity_increase}")
-            print(f"  - Value increase: {total_value_increase}")
-            
+            context['total_final_quantity'] = total_final_quantity
+
+            # Extra info
             context['store_name'] = restock.store.name
             context['restock_status'] = restock.status
             context['created_at'] = restock.generated_at
             context['updated_at'] = restock.generated_at
-            
+
+            # Debug
+            print("\n[DEBUG] Review Summary")
+            print(f"  - Total items: {items.count()}")
+            print(f"  - Quantity added: {total_quantity_increase}")
+            print(f"  - Final quantity: {total_final_quantity}")
+            print(f"  - Current value: {total_current_value}")
+            print(f"  - Final value: {total_new_value}")
+            print(f"  - Value increase: {total_value_increase}")
+
         except BulkRestock.DoesNotExist:
             print(f"[ERROR] Restock {restock_id} not found!")
+
             context['can_submit'] = False
-            context['error_message'] = f"Restock with ID {restock_id} not found."
+            context['error_message'] = (
+                f"Restock with ID {restock_id} not found."
+            )
+
         except Exception as e:
             print(f"[ERROR] Exception fetching restock: {str(e)}")
+
             import traceback
             traceback.print_exc()
+
             context['can_submit'] = False
-            context['error_message'] = f"Error loading restock: {str(e)}"
-        
-        # API endpoints for JavaScript
+            context['error_message'] = (
+                f"Error loading restock: {str(e)}"
+            )
+
+        # API endpoints
         context['api_endpoints'] = {
             'get_restock': f'/api/bulk-restock/{restock_id}/',
             'summary': f'/api/bulk-restock/{restock_id}/summary/',
             'submit_review': f'/api/bulk-restock/{restock_id}/submit_review/',
             'process': f'/api/bulk-restock/{restock_id}/process/',
         }
-        
-        print(f"[DEBUG] Template: {self.template_name}")
-        print(f"[DEBUG] Can submit: {context.get('can_submit', False)}")
-        print("="*60)
-        print("[PAGE VIEW] BulkRestockReviewPageView - END")
-        print("="*60 + "\n")
-        
-        return context
-    
-    def get(self, request, *args, **kwargs):
-        print(f"\n[HTTP GET] BulkRestockReviewPageView - Loading review page for restock {self.kwargs['pk']}")
-        return super().get(request, *args, **kwargs)
 
+        print(f"\n[DEBUG] Template: {self.template_name}")
+        print(f"[DEBUG] Can submit: {context.get('can_submit', False)}")
+
+        print("=" * 60)
+        print("[PAGE VIEW] BulkRestockReviewPageView - END")
+        print("=" * 60 + "\n")
+
+        return context
+
+    def get(self, request, *args, **kwargs):
+        print(
+            f"\n[HTTP GET] BulkRestockReviewPageView - "
+            f"Loading review page for restock {self.kwargs['pk']}"
+        )
+
+        return super().get(request, *args, **kwargs)
 
 class BulkRestockSuccessPageView(LoginRequiredMixin, TemplateView):
     """Step 5: Success page after processing"""
@@ -573,63 +659,7 @@ class BulkRestockViewSet(viewsets.ModelViewSet):
         
         return Response(response_data)
 
-    # =========================================================
-    # 2. CREATE DRAFT (Step 2)
-    # =========================================================
-    # @action(detail=False, methods=['post'])
-    # def create_draft(self, request):
-    #     """
-    #     Create bulk restock draft
-    #     """
-    #     print("\n" + "="*60)
-    #     print("[STEP 2] create_draft - START")
-    #     print("="*60)
-        
-    #     store_id = request.data.get('store')
-    #     items = request.data.get('items', [])
-        
-    #     print(f"[DEBUG] Request data - store_id: {store_id}")
-    #     print(f"[DEBUG] Items count: {len(items)}")
-    #     if items:
-    #         print(f"[DEBUG] First item sample: {items[0] if items else 'None'}")
 
-    #     if not store_id:
-    #         print("[ERROR] store is missing")
-    #         return Response(
-    #             {'error': 'store is required'},
-    #             status=status.HTTP_400_BAD_REQUEST
-    #         )
-
-    #     if not items:
-    #         print("[ERROR] No items provided")
-    #         return Response(
-    #             {'error': 'At least one item is required'},
-    #             status=status.HTTP_400_BAD_REQUEST
-    #         )
-
-    #     try:
-    #         print(f"[DEBUG] Calling BulkRestockService.create_draft for store {store_id}...")
-    #         restock = BulkRestockService.create_draft(
-    #             store_id=store_id,
-    #             data=request.data,
-    #             user=request.user
-    #         )
-    #         print(f"[DEBUG] Draft created successfully - ID: {restock.id}, Status: {restock.status}")
-
-    #         serializer = BulkRestockDetailSerializer(restock)
-    #         response_data = serializer.data
-    #         print(f"[DEBUG] Response data prepared - Restock ID: {response_data.get('id')}")
-    #         print("="*60)
-    #         print("[STEP 2] create_draft - END")
-    #         print("="*60 + "\n")
-            
-    #         return Response(response_data, status=status.HTTP_201_CREATED)
-
-    #     except Exception as e:
-    #         print(f"[ERROR] Exception in create_draft: {str(e)}")
-    #         import traceback
-    #         traceback.print_exc()
-    #         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     @action(detail=False, methods=['post'])
     def create_draft(self, request):
         """
@@ -847,70 +877,7 @@ class BulkRestockViewSet(viewsets.ModelViewSet):
             print(f"[ERROR] ValueError in bulk_update_items: {str(e)}")
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    # =========================================================
-    # 7. SUMMARY (Review Step)
-    # =========================================================
-    # @action(detail=True, methods=['get'])
-    # def summary(self, request, pk=None):
-    #     """
-    #     Get summary of the restock draft
-    #     """
-    #     print("\n" + "="*60)
-    #     print(f"[STEP 7] summary - START (Restock ID: {pk})")
-    #     print("="*60)
 
-    #     restock = self.get_object()
-    #     print(f"[DEBUG] Restock found - Status: {restock.status}, Store: {restock.store.name}")
-        
-    #     items = restock.items.select_related('product')
-    #     print(f"[DEBUG] Total items in restock: {items.count()}")
-
-    #     summary = {
-    #         'total_items': items.count(),
-    #         'total_current_quantity': sum(i.current_quantity for i in items),
-    #         'total_new_quantity': sum(i.new_quantity for i in items),
-    #         'total_quantity_increase': sum(i.quantity_change for i in items),
-    #         'total_current_value': sum(i.current_quantity * i.current_price for i in items),
-    #         'total_new_value': sum(
-    #             i.new_quantity * (i.new_price or i.current_price)
-    #             for i in items
-    #         ),
-    #         'items_by_category': {}
-    #     }
-        
-    #     print(f"[DEBUG] Summary calculations:")
-    #     print(f"  - Total quantity increase: {summary['total_quantity_increase']}")
-    #     print(f"  - Total current value: {summary['total_current_value']}")
-    #     print(f"  - Total new value: {summary['total_new_value']}")
-
-    #     for item in items:
-    #         cat = item.product.category.name if item.product.category else 'Uncategorized'
-
-    #         if cat not in summary['items_by_category']:
-    #             summary['items_by_category'][cat] = {
-    #                 'count': 0,
-    #                 'quantity_increase': 0,
-    #                 'value_increase': 0
-    #             }
-
-    #         summary['items_by_category'][cat]['count'] += 1
-    #         summary['items_by_category'][cat]['quantity_increase'] += item.quantity_change
-
-    #     print(f"[DEBUG] Categories breakdown: {list(summary['items_by_category'].keys())}")
-
-    #     response_data = {
-    #         'restock': BulkRestockDetailSerializer(restock).data,
-    #         'summary': summary
-    #     }
-        
-    #     print("="*60)
-    #     print("[STEP 7] summary - END")
-    #     print("="*60 + "\n")
-        
-    #     return Response(response_data)
-
-    # from rest_framework.decorators import action
-    # from rest_framework.response import Response
 
     # =========================================================
     @action(detail=True, methods=['get'])
@@ -981,7 +948,8 @@ class BulkRestockViewSet(viewsets.ModelViewSet):
 
         try:
             print(f"[DEBUG] Calling BulkRestockService.submit_for_review for restock {pk}...")
-            restock = BulkRestockService.submit_for_review(pk)
+            # restock = BulkRestockService.submit_for_review(pk)
+            restock = BulkRestockService.submit_for_review(pk, request.user)
             print(f"[DEBUG] Restock submitted for review. New status: {restock.status}")
             
             serializer = BulkRestockDetailSerializer(restock)

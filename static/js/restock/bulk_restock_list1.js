@@ -158,7 +158,7 @@ class BulkRestockList {
             this.totalPages = 1;
         }
 
-        if (this.isLoading) {
+        if (this.isLoading) { 
             console.log("[DEBUG] Already loading. Returning...");
             return;
         }
@@ -171,7 +171,8 @@ class BulkRestockList {
 
             console.log("[DEBUG] Filter params:", params.toString());
 
-            const url = `/inventory/workflow-bulk-restocks/?${params.toString()}`;
+            // const url = `/inventory/workflow-bulk-restocks/?${params.toString()}`;
+            const url = `/inventory/workflow-bulk-restocks/my_restocks/?${params.toString()}`;
 
             console.log("[DEBUG] Fetch URL:", url);
 

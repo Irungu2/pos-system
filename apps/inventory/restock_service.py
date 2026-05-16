@@ -1,12 +1,17 @@
 # services.py
 from django.db import models
-
+from django.utils import timezone
+from django.db import transaction
 from django.db import transaction
 from django.db.models import Q, F
 from decimal import Decimal
 from typing import List, Dict, Any
 from django.utils import timezone
+
 from .models import BulkRestock, BulkRestockItem, StoreStock, StockTransaction, Product
+
+
+from .services import StoreStockService
 
 
 class BulkRestockService:
@@ -176,24 +181,56 @@ class BulkRestockService:
 
         return restock
 
+    # @staticmethod
+    # @transaction.atomic
+    # def submit_for_review(restock_id: int) -> BulkRestock:
+    #     """Submit restock for final review"""
+    #     print(f"[BulkRestockService] Submitting restock_id={restock_id} for review")
+
+    #     restock = BulkRestock.objects.get(id=restock_id)
+
+    #     if restock.status not in ['draft','editing', 'reviewed']:
+    #         print(f"[BulkRestockService] Invalid status={restock.status}")
+    #         raise ValueError(f"Cannot submit for review when status is {restock.status}")
+
+    #     restock.status = 'reviewed'
+    #     restock.save(update_fields=['status'])
+
+    #     print(f"[BulkRestockService] Restock {restock.id} submitted for review")
+
+    #     return restock
+
     @staticmethod
     @transaction.atomic
-    def submit_for_review(restock_id: int) -> BulkRestock:
-        """Submit restock for final review"""
+    def submit_for_review(restock_id: int, user) -> BulkRestock:
+        """Submit restock for final review and immediately process it"""
+
         print(f"[BulkRestockService] Submitting restock_id={restock_id} for review")
 
         restock = BulkRestock.objects.get(id=restock_id)
 
-        if restock.status not in ['editing', 'reviewed']:
+        if restock.status not in ['draft', 'editing', 'reviewed']:
             print(f"[BulkRestockService] Invalid status={restock.status}")
-            raise ValueError(f"Cannot submit for review when status is {restock.status}")
+            raise ValueError(
+                f"Cannot submit for review when status is {restock.status}"
+            )
 
+        # -----------------------------
+        # Move to reviewed
+        # -----------------------------
         restock.status = 'reviewed'
         restock.save(update_fields=['status'])
 
         print(f"[BulkRestockService] Restock {restock.id} submitted for review")
 
-        return restock
+        # -----------------------------
+        # AUTO PROCESS AFTER REVIEW
+        # -----------------------------
+        return BulkRestockService.process_restock(
+            restock_id=restock.id,
+            user=user
+        )
+
 
     @staticmethod
     @transaction.atomic
@@ -207,7 +244,9 @@ class BulkRestockService:
 
         if restock.status != 'reviewed':
             print(f"[BulkRestockService] Invalid status={restock.status}")
-            raise ValueError(f"Cannot process restock when status is {restock.status}")
+            raise ValueError(
+                f"Cannot process restock when status is {restock.status}"
+            )
 
         restock.status = 'processing'
         restock.save(update_fields=['status'])
@@ -218,52 +257,28 @@ class BulkRestockService:
             for item in restock.items.all():
                 print(f"[BulkRestockService] Processing item_id={item.id}")
 
+                # -----------------------------
+                # STOCK UPDATE (via service)
+                # -----------------------------
                 if item.new_quantity != item.current_quantity:
 
-                    store_stock, created = StoreStock.objects.get_or_create(
-                        store=restock.store,
-                        product=item.product,
-                        defaults={'quantity': item.new_quantity}
-                    )
-
-                    if created:
-                        print(f"[BulkRestockService] Created new stock record")
-                    else:
-                        print(
-                            f"[BulkRestockService] Updating stock "
-                            f"{store_stock.quantity} -> {item.new_quantity}"
-                        )
-
-                        store_stock.quantity = item.new_quantity
-                        store_stock.save()
-
-                    quantity_change = abs(
-                        item.new_quantity - item.current_quantity
-                    )
-
-                    transaction_type = (
-                        StockTransaction.IN
-                        if item.new_quantity > item.current_quantity
-                        else StockTransaction.OUT
-                    )
-
-                    StockTransaction.objects.create(
+                    StoreStockService.adjust_stock(
                         product=item.product,
                         store=restock.store,
-                        transaction_type=transaction_type,
-                        quantity=quantity_change,
-                        performed_by=user,
-                        remarks=(
-                            f"Bulk Restock #{restock.id} - "
-                            f"{restock.notes or 'Bulk restock operation'}"
-                        )
+                        action="add",
+                        quantity=item.new_quantity,
+                        user=user,
+                        reference=f"BULK_RESTOCK_{restock.id}",
+                        remarks=restock.notes or "Bulk restock operation"
                     )
 
                     print(
-                        f"[BulkRestockService] Stock transaction created "
-                        f"for product_id={item.product.id}"
+                        f"[BulkRestockService] Stock adjusted for product_id={item.product.id}"
                     )
 
+                # -----------------------------
+                # PRICE UPDATE
+                # -----------------------------
                 if item.new_price and item.new_price != item.current_price:
                     print(
                         f"[BulkRestockService] Updating product price "
@@ -273,6 +288,9 @@ class BulkRestockService:
                     item.product.selling_price = item.new_price
                     item.product.save(update_fields=['selling_price'])
 
+            # -----------------------------
+            # MARK COMPLETED
+            # -----------------------------
             restock.status = 'completed'
             restock.completed = True
             restock.completed_at = timezone.now()
@@ -290,6 +308,7 @@ class BulkRestockService:
         except Exception as e:
             print(f"[BulkRestockService] Error processing restock: {str(e)}")
 
+            # rollback status
             restock.status = 'reviewed'
             restock.save(update_fields=['status'])
 

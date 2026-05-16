@@ -469,7 +469,8 @@ urlpatterns = [
     ),
 
     path(
-        "workflow-bulk-restocks/success/",
+        # "workflow-bulk-restocks/success/",
+        "workflow-bulk-restocks/<int:pk>/success/",
         login_required(BulkRestockSuccessPageView.as_view()),
         name="bulk_restock_success",
     ),

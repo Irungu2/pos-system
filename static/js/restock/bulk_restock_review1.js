@@ -206,7 +206,7 @@ class BulkRestockReview {
             );
 
             if (res.ok) {
-                window.location.href = '/inventory/workflow-bulk-restocks/';
+                window.location.href = `/inventory/workflow-bulk-restocks/${this.restockId}/success/`;
             } else {
                 const err = await res.json();
                 this.showError(err.error || 'Failed');
