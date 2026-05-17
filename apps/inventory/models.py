@@ -516,7 +516,10 @@ class BulkRestockItem(models.Model):
     def __str__(self):
         return f"{self.product.name} - {self.current_quantity} → {self.new_quantity}"
     
+    # @property
+    # def quantity_change(self):
+    #     return self.new_quantity - self.current_quantity
+
     @property
     def quantity_change(self):
-        return self.new_quantity - self.current_quantity
-
+        return self.new_quantity

@@ -289,24 +289,70 @@ class BulkRestockList {
         }
     }
     
+    // renderRestocks(restocks) {
+    //     if (!restocks || restocks.length === 0) return '';
+        
+    //     return restocks.map(restock => `
+    //         <tr data-restock-id="${restock.id}">
+    //             <td>${restock.id}</td>
+    //             <td>${restock.store?.name || '-'}</td>
+    //             <td>${restock.category?.name || 'All'}</td>
+    //             <td><span class="status-badge status-${restock.status}">${restock.status}</span></td>
+    //             <td>${restock.items?.length || 0}</td>
+    //             <td>${restock.total_quantity_change || 0}</td>
+    //             <td>$${this.formatNumber(restock.total_value || 0)}</td>
+    //             <td>${this.formatDate(restock.created_at)}</td>
+    //             <td>${this.getActionButtons(restock)}</td>
+    //         </tr>
+    //     `).join('');
+    // }
     renderRestocks(restocks) {
         if (!restocks || restocks.length === 0) return '';
-        
-        return restocks.map(restock => `
-            <tr data-restock-id="${restock.id}">
-                <td>${restock.id}</td>
-                <td>${restock.store?.name || '-'}</td>
-                <td>${restock.category?.name || 'All'}</td>
-                <td><span class="status-badge status-${restock.status}">${restock.status}</span></td>
-                <td>${restock.items?.length || 0}</td>
-                <td>${restock.total_quantity_change || 0}</td>
-                <td>$${this.formatNumber(restock.total_value || 0)}</td>
-                <td>${this.formatDate(restock.created_at)}</td>
-                <td>${this.getActionButtons(restock)}</td>
-            </tr>
-        `).join('');
+
+        return restocks.map(restock => {
+
+            // compute total quantity change from items[]
+            const totalQtyChange = (restock.items || []).reduce(
+                (sum, item) => sum + (item.quantity_change || 0),
+                0
+            );
+
+            // optional: compute total value change
+            const totalValue = (restock.items || []).reduce(
+                (sum, item) => {
+                    const change = item.quantity_change || 0;
+                    const price = parseFloat(item.new_price || item.current_price || 0);
+                    return sum + (change * price);
+                },
+                0
+            );
+
+            return `
+                <tr data-restock-id="${restock.id}">
+                    <td>#${restock.id}</td>
+
+                    <td>${this.capitalize(restock.store_name || '-') }</td>
+
+                    <td>
+                        <span class="status-badge status-${restock.status}">
+                            ${restock.status}
+                        </span>
+                    </td>
+
+                    <td>${restock.items_count ?? restock.items?.length ?? 0}</td>
+
+                    <td>${this.formatNumber(totalQtyChange)}</td>
+
+                    <td>$${this.formatNumber(totalValue)}</td>
+
+                    <td>${this.formatDate(restock.generated_at)}</td>
+
+                    <td>${this.getActionButtons(restock)}</td>
+                </tr>
+            `;
+        }).join('');
     }
-    
+
     getActionButtons(restock) {
         const baseUrl = `/inventory/workflow-bulk-restocks/${restock.id}`;
         
@@ -351,6 +397,10 @@ class BulkRestockList {
             maximumFractionDigits: 2
         });
     }
+    capitalize(str) {
+        return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+    }
+
     
     formatDate(dateString) {
         if (!dateString) return '-';

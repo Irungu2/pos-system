@@ -807,6 +807,84 @@ def print_product_barcode(request, product_id):
 
 
 
+ 
+# def print_multiple_barcodes(request):
+#     """Print barcodes for multiple products"""
+
+#     product_ids = request.GET.get('ids', '')
+#     product_ids = [pid for pid in product_ids.split(',') if pid]
+
+#     products = Product.objects.filter(id__in=product_ids, is_active=True)
+
+#     response = HttpResponse(content_type='application/pdf')
+#     response['Content-Disposition'] = 'inline; filename="barcodes.pdf"'
+
+#     p = canvas.Canvas(response, pagesize=(210 * mm, 297 * mm))  # A4
+
+#     x_pos = 10 * mm
+#     y_pos = 280 * mm
+#     labels_per_row = 3
+
+#     for i, product in enumerate(products):
+
+#         # Generate barcode
+#         EAN13 = barcode.get_barcode_class('ean13')
+#         ean = EAN13(str(product.barcode), writer=ImageWriter())
+
+#         buffer = io.BytesIO()
+#         ean.write(buffer)
+#         buffer.seek(0)
+
+#         # FIX: convert to ImageReader (important)
+#         image = ImageReader(buffer)
+
+#         # Draw product name
+#         p.setFont("Helvetica", 8)
+#         p.drawString(x_pos, y_pos + 20 * mm, product.name[:20])
+
+#         # Draw barcode image
+#         p.drawImage(
+#             image,
+#             x_pos,
+#             y_pos + 5 * mm,
+#             width=50 * mm,
+#             height=15 * mm,
+#             preserveAspectRatio=True,
+#             mask='auto'
+#         )
+
+#         # Draw price
+#         p.setFont("Helvetica", 10)
+#         p.drawString(x_pos, y_pos, f"${product.selling_price}")
+
+#         # Move position
+#         x_pos += 65 * mm
+
+#         if (i + 1) % labels_per_row == 0:
+#             x_pos = 10 * mm
+#             y_pos -= 40 * mm
+
+#         if y_pos < 20 * mm:
+#             p.showPage()
+#             y_pos = 280 * mm
+#             x_pos = 10 * mm
+
+#     p.save()
+#     return response
+
+# import io
+
+# from django.http import HttpResponse
+# from reportlab.pdfgen import canvas
+# from reportlab.lib.units import mm
+# from reportlab.lib.utils import ImageReader
+
+# import barcode
+# from barcode.writer import ImageWriter
+# from PIL import Image
+
+# from .models import Product
+
 
 def print_multiple_barcodes(request):
     """Print barcodes for multiple products"""
@@ -814,64 +892,93 @@ def print_multiple_barcodes(request):
     product_ids = request.GET.get('ids', '')
     product_ids = [pid for pid in product_ids.split(',') if pid]
 
-    products = Product.objects.filter(id__in=product_ids, is_active=True)
+    products = Product.objects.filter(
+        id__in=product_ids,
+        is_active=True
+    )
 
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'inline; filename="barcodes.pdf"'
 
-    p = canvas.Canvas(response, pagesize=(210 * mm, 297 * mm))  # A4
+    # A4 page size
+    p = canvas.Canvas(response, pagesize=(210 * mm, 297 * mm))
 
     x_pos = 10 * mm
     y_pos = 280 * mm
+
     labels_per_row = 3
 
     for i, product in enumerate(products):
 
-        # Generate barcode
-        EAN13 = barcode.get_barcode_class('ean13')
-        ean = EAN13(str(product.barcode), writer=ImageWriter())
+        try:
+            # Ensure barcode is 12 digits for EAN13
+            barcode_number = str(product.barcode).zfill(12)[:12]
 
-        buffer = io.BytesIO()
-        ean.write(buffer)
-        buffer.seek(0)
+            # Generate barcode
+            EAN13 = barcode.get_barcode_class('ean13')
+            ean = EAN13(barcode_number, writer=ImageWriter())
 
-        # FIX: convert to ImageReader (important)
-        image = ImageReader(buffer)
+            # Create image buffer
+            buffer = io.BytesIO()
 
-        # Draw product name
-        p.setFont("Helvetica", 8)
-        p.drawString(x_pos, y_pos + 20 * mm, product.name[:20])
+            # Save as PNG
+            ean.write(buffer, options={"format": "PNG"})
+            buffer.seek(0)
 
-        # Draw barcode image
-        p.drawImage(
-            image,
-            x_pos,
-            y_pos + 5 * mm,
-            width=50 * mm,
-            height=15 * mm,
-            preserveAspectRatio=True,
-            mask='auto'
-        )
+            # Open image with PIL
+            pil_image = Image.open(buffer)
 
-        # Draw price
-        p.setFont("Helvetica", 10)
-        p.drawString(x_pos, y_pos, f"${product.selling_price}")
+            # Convert to ReportLab image
+            image = ImageReader(pil_image)
 
-        # Move position
-        x_pos += 65 * mm
+            # Draw product name
+            p.setFont("Helvetica", 8)
+            p.drawString(
+                x_pos,
+                y_pos + 20 * mm,
+                product.name[:20]
+            )
 
-        if (i + 1) % labels_per_row == 0:
-            x_pos = 10 * mm
-            y_pos -= 40 * mm
+            # Draw barcode image
+            p.drawImage(
+                image,
+                x_pos,
+                y_pos + 5 * mm,
+                width=50 * mm,
+                height=15 * mm,
+                preserveAspectRatio=True,
+                mask='auto'
+            )
 
-        if y_pos < 20 * mm:
-            p.showPage()
-            y_pos = 280 * mm
-            x_pos = 10 * mm
+            # Draw price
+            p.setFont("Helvetica", 10)
+            p.drawString(
+                x_pos,
+                y_pos,
+                f"${product.selling_price}"
+            )
+
+            # Move to next label position
+            x_pos += 65 * mm
+
+            # New row
+            if (i + 1) % labels_per_row == 0:
+                x_pos = 10 * mm
+                y_pos -= 40 * mm
+
+            # New page
+            if y_pos < 20 * mm:
+                p.showPage()
+                y_pos = 280 * mm
+                x_pos = 10 * mm
+
+        except Exception as e:
+            print(f"Barcode generation error for product {product.id}: {e}")
 
     p.save()
-    return response
 
+    return response
+    
 
 def barcode_print_page(request):
     """HTML page for selecting products to print"""

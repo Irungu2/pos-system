@@ -400,7 +400,7 @@ class BulkRestockSerializer(serializers.ModelSerializer):
     class Meta:
         model = BulkRestock
         fields = [
-            'id', 'store', 'store_name', 'category','status', 'category_name',
+            'id', 'store', 'store_name','status' ,'category_name',
             'include_all', 'generated_at', 'completed', 'completed_at',
             'notes', 'items_count', 'items'
         ]

@@ -1305,66 +1305,24 @@ class BulkRestockViewSet(viewsets.ModelViewSet):
     # =========================================================
     # 10. LIST VIEWS
     # =========================================================
-
-    # @action(detail=False, methods=['get'])
-    # def Allrestocks(self, request):
-    #     """
-    #     Get restocks created by current user with optional status filter
-    #     """
-
-    #     print("\n" + "="*60)
-    #     print("[LIST] my_restocks - START")
-    #     print("="*60)
-
-    #     restocks = self.get_queryset().filter(completed_by=request.user)
-
-    #     status = request.query_params.get("status")
-
-    #     print(f"[DEBUG] Status filter received: {status}")
-
-    #     if status:
-    #         # single status
-    #         restocks = restocks.filter(status=status)
-
-    #     print(f"[DEBUG] Found {restocks.count()} restocks for user")
-
-    #     serializer = self.get_serializer(restocks, many=True)
-
-    #     print("="*60)
-    #     print("[LIST] my_restocks - END")
-    #     print("="*60 + "\n")
-
-    #     return Response(serializer.data)
-
-
-
     @action(detail=False, methods=['get'])
     def Allrestocks(self, request):
         """
         Get all restocks with optional status filter
         """
 
-        print("\n" + "="*60)
-        print("[LIST] Allrestocks - START")
-        print("="*60)
-
-        # Return all restocks
-        restocks = self.get_queryset()
+        restocks = self.get_queryset().order_by('-id')
 
         status = request.query_params.get("status")
 
-        print(f"[DEBUG] Status filter received: {status}")
-
         if status:
-            # single status
             restocks = restocks.filter(status=status)
 
-        print(f"[DEBUG] Found {restocks.count()} restocks")
+        page = self.paginate_queryset(restocks)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(restocks, many=True)
-
-        print("="*60)
-        print("[LIST] Allrestocks - END")
-        print("="*60 + "\n")
-
         return Response(serializer.data)
