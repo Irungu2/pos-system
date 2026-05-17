@@ -884,8 +884,7 @@ def print_product_barcode(request, product_id):
 # from PIL import Image
 
 # from .models import Product
-
-
+from PIL import Image
 def print_multiple_barcodes(request):
     """Print barcodes for multiple products"""
 
@@ -900,38 +899,33 @@ def print_multiple_barcodes(request):
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'inline; filename="barcodes.pdf"'
 
-    # A4 page size
     p = canvas.Canvas(response, pagesize=(210 * mm, 297 * mm))
 
     x_pos = 10 * mm
     y_pos = 280 * mm
-
     labels_per_row = 3
 
     for i, product in enumerate(products):
 
         try:
-            # Ensure barcode is 12 digits for EAN13
-            barcode_number = str(product.barcode).zfill(12)[:12]
+            # --- Barcode format (EAN13 = 12 digits input) ---
+            barcode_number = ''.join(filter(str.isdigit, str(product.barcode or ""))).zfill(12)[:12]
 
-            # Generate barcode
+            if len(barcode_number) != 12:
+                continue
+
+            # --- Generate barcode ---
             EAN13 = barcode.get_barcode_class('ean13')
             ean = EAN13(barcode_number, writer=ImageWriter())
 
-            # Create image buffer
             buffer = io.BytesIO()
-
-            # Save as PNG
             ean.write(buffer, options={"format": "PNG"})
             buffer.seek(0)
 
-            # Open image with PIL
-            pil_image = Image.open(buffer)
+            # --- Direct conversion (NO PIL needed) ---
+            image = ImageReader(buffer)
 
-            # Convert to ReportLab image
-            image = ImageReader(pil_image)
-
-            # Draw product name
+            # --- Draw product name ---
             p.setFont("Helvetica", 8)
             p.drawString(
                 x_pos,
@@ -939,7 +933,7 @@ def print_multiple_barcodes(request):
                 product.name[:20]
             )
 
-            # Draw barcode image
+            # --- Draw barcode ---
             p.drawImage(
                 image,
                 x_pos,
@@ -950,7 +944,7 @@ def print_multiple_barcodes(request):
                 mask='auto'
             )
 
-            # Draw price
+            # --- Draw price ---
             p.setFont("Helvetica", 10)
             p.drawString(
                 x_pos,
@@ -958,27 +952,24 @@ def print_multiple_barcodes(request):
                 f"${product.selling_price}"
             )
 
-            # Move to next label position
+            # --- Layout ---
             x_pos += 65 * mm
 
-            # New row
             if (i + 1) % labels_per_row == 0:
                 x_pos = 10 * mm
                 y_pos -= 40 * mm
 
-            # New page
             if y_pos < 20 * mm:
                 p.showPage()
                 y_pos = 280 * mm
                 x_pos = 10 * mm
 
-        except Exception as e:
-            print(f"Barcode generation error for product {product.id}: {e}")
+        except Exception:
+            continue
 
     p.save()
 
     return response
-    
 
 def barcode_print_page(request):
     """HTML page for selecting products to print"""
