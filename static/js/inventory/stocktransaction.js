@@ -708,7 +708,7 @@ class TransactionUI {
                 </td>
                 <td class="text-end fw-bold">${TransactionUtils.formatNumber(transaction.quantity)}</td>
                 <td>${TransactionUtils.escapeHtml(transaction.reference || '—')}</td>
-                <td>${TransactionUtils.escapeHtml(transaction.performed_by_name || 'System')}</td>
+                <td>${TransactionUtils.escapeHtml(transaction.performed_by || 'System')}</td>
                 <td>${TransactionUtils.escapeHtml(transaction.remarks || '')}</td>
                 <td>
                     <div class="btn-group btn-group-sm">

@@ -5,64 +5,124 @@
 
 {% block content %}
 <div class="container">
-    <div class="success-container">
-        <div class="success-icon">
-            ✓
-        </div>
-        
-        <h1>Restock Completed Successfully!</h1>
-        
-        <p class="success-message">
-            The bulk restock has been processed and inventory has been updated.
-        </p>
-        
-        <div class="success-card">
-            <h3>Restock Summary</h3>
-            <div class="summary-row">
-                <span class="label">Restock ID:</span>
-                <span class="value" id="restock-id">Loading...</span>
-            </div>
-            <div class="summary-row">
-                <span class="label">Store:</span>
-                <span class="value" id="store-name">Loading...</span>
-            </div>
-            <div class="summary-row">
-                <span class="label">Status:</span>
-                <span class="value" id="status">Loading...</span>
-            </div>
-            <div class="summary-row">
-                <span class="label">Total Items:</span>
-                <span class="value" id="total-items">Loading...</span>
-            </div>
-            <div class="summary-row">
-                <span class="label">Total Quantity:</span>
-                <span class="value" id="total-quantity">Loading...</span>
-            </div>
-            <div class="summary-row highlight">
-                <span class="label">Total Value:</span>
-                <span class="value" id="total-value">Loading...</span>
-            </div>
-            <div class="summary-row">
-                <span class="label">Processed By:</span>
-                <span class="value" id="processed-by">Loading...</span>
-            </div>
-            <div class="summary-row">
-                <span class="label">Processed At:</span>
-                <span class="value" id="processed-at">Loading...</span>
-            </div>
-        </div>
-        
-        <div class="action-buttons">
-            <a href="{% url 'inventory:bulk_restock_page1' %}" class="btn-primary">
+    <!-- Header with back action (consistent with edit page style) -->
+    <div class="page-header">
+        <h2>Restock Completed Successfully</h2>
+        <div class="header-actions">
+            <a href="{% url 'inventory:bulk_restock_page1' %}" class="btn-secondary">
                 ← Back to Restocks List
             </a>
-            <a href="#" id="print-summary-btn" class="btn-secondary">
-                🖨️ Print Summary
-            </a>
-            <a href="#" id="new-restock-btn" class="btn-success">
-                + New Restock
-            </a>
         </div>
+    </div>
+
+    <!-- Success Status Card (clean and modern) -->
+    <div class="success-status-card">
+        <div class="success-icon-wrapper">
+            <div class="success-icon">✓</div>
+        </div>
+        <h1>Restock Completed Successfully!</h1>
+        <p class="success-message">The bulk restock has been processed and inventory has been updated.</p>
+    </div>
+
+    <!-- Restock Info Grid (matches edit page style) -->
+    <div class="restock-info-grid">
+        <!-- Summary Card -->
+        <div class="info-card">
+            <h3>Restock Summary</h3>
+            <div class="info-row">
+                <span class="info-label">Restock ID:</span>
+                <span class="info-value" id="restock-id">Loading...</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Store:</span>
+                <span class="info-value" id="store-name">Loading...</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Status:</span>
+                <span class="info-value" id="status">Loading...</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Processed By:</span>
+                <span class="info-value" id="processed-by">Loading...</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Processed At:</span>
+                <span class="info-value" id="processed-at">Loading...</span>
+            </div>
+        </div>
+
+        <!-- Financial Summary Card -->
+        <div class="summary-card">
+            <h3>Financial Summary</h3>
+            <div class="info-row">
+                <span class="info-label">Total Items:</span>
+                <span class="info-value highlight-number" id="total-items">Loading...</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Total Quantity Added:</span>
+                <span class="info-value highlight-number" id="total-quantity-added">Loading...</span>
+            </div>
+            <div class="info-row highlight-row">
+                <span class="info-label">Total Value Added:</span>
+                <span class="info-value total-value" id="total-value-added">Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Products Section (same table style as edit page) -->
+    <div class="products-section">
+        <div class="section-header">
+            <h3>Restock Items</h3>
+            <div class="selection-actions">
+                <button id="print-summary-btn" class="btn-sm btn-secondary">
+                    🖨️ Print Summary
+                </button>
+            </div>
+        </div>
+
+        <div id="products-table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Current Qty</th>
+                        <th>Added</th>
+                        <th>Final Qty</th>
+                        <th>Old Price</th>
+                        <th>New Price</th>
+                        <th>Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody id="restock-items-body">
+                    <tr>
+                        <td colspan="7" class="loading-cell">Loading restock items...</td>
+                    </tr>
+                </tbody>
+                <tfoot id="restock-items-footer" style="display: none;">
+                    <tr class="table-footer">
+                        <td colspan="2"><strong>Totals</strong></td>
+                        <td><strong id="footer-total-qty">0</strong></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td><strong id="footer-total-value">$0.00</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- Action Buttons (consistent with edit page style) -->
+    <div class="action-bar">
+        <a href="{% url 'inventory:bulk_restock_page1' %}" class="btn-secondary">
+            ← Back to Restocks List
+        </a>
+        <a href="#" id="new-restock-btn" class="btn-primary">
+            + New Restock
+        </a>
+        <a href="#" id="print-summary-btn-bottom" class="btn-success">
+            🖨️ Print Summary
+        </a>
     </div>
 </div>
 
@@ -71,183 +131,351 @@
     <div class="spinner"></div>
 </div>
 
-
 <script>
     window.RESTOCK_ID = "{{ restock_id }}";
 </script>
+
 <script src="{% static 'js/restock/bulk_restock_success1.js' %}"></script>
 
 <style>
+/* ============================================
+   Modern, Clean Styling (Matches Edit Page Style)
+   ============================================ */
+
+/* General Layout */
 .container {
-    max-width: 800px;
+    max-width: 1400px;
     margin: 0 auto;
-    padding: 40px 20px;
+    padding: 20px;
 }
 
-.success-container {
+/* Page Header */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.page-header h2 {
+    margin: 0;
+    color: #1a1a2e;
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+
+.header-actions {
+    display: flex;
+    gap: 12px;
+}
+
+/* Success Status Card */
+.success-status-card {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border-radius: 16px;
+    padding: 32px;
     text-align: center;
+    margin-bottom: 30px;
+    border: 1px solid #bbf7d0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.success-icon-wrapper {
+    margin-bottom: 20px;
 }
 
 .success-icon {
-    width: 80px;
-    height: 80px;
-    background: #28a745;
+    width: 72px;
+    height: 72px;
+    background: #22c55e;
     color: white;
     border-radius: 50%;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 48px;
-    margin-bottom: 20px;
-    animation: scaleIn 0.5s ease-out;
+    font-size: 44px;
+    font-weight: bold;
+    box-shadow: 0 8px 20px rgba(34,197,94,0.3);
+    animation: scaleIn 0.3s ease-out;
 }
 
 @keyframes scaleIn {
-    0% {
-        transform: scale(0);
-        opacity: 0;
-    }
-    100% {
-        transform: scale(1);
-        opacity: 1;
-    }
+    0% { transform: scale(0); opacity: 0; }
+    80% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
 }
 
-h1 {
-    color: #28a745;
-    margin-bottom: 10px;
-    animation: fadeInUp 0.5s ease-out;
+.success-status-card h1 {
+    font-size: 1.8rem;
+    color: #166534;
+    margin: 0 0 12px 0;
+    font-weight: 600;
 }
 
 .success-message {
-    color: #666;
-    font-size: 16px;
+    font-size: 1rem;
+    color: #15803d;
+    margin: 0;
+}
+
+/* Restock Info Grid */
+.restock-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 24px;
     margin-bottom: 30px;
-    animation: fadeInUp 0.5s ease-out 0.1s both;
 }
 
-.success-card {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 30px;
-    text-align: left;
-    animation: fadeInUp 0.5s ease-out 0.2s both;
+.info-card, .summary-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border: 1px solid #e2e8f0;
+    transition: box-shadow 0.2s ease;
 }
 
-.success-card h3 {
-    margin-top: 0;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid #007bff;
-    color: #333;
+.info-card:hover, .summary-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
-.summary-row {
+.info-card h3, .summary-card h3 {
+    margin: 0 0 18px 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e293b;
+    border-left: 4px solid #3b82f6;
+    padding-left: 12px;
+}
+
+.info-row {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     padding: 10px 0;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid #f1f5f9;
 }
 
-.summary-row.highlight {
-    background: #e8f4f8;
-    padding: 12px;
-    margin: 5px 0;
-    border-radius: 4px;
-    font-weight: bold;
+.info-row:last-child {
+    border-bottom: none;
 }
 
-.summary-row .label {
-    font-weight: bold;
-    color: #666;
+.info-label {
+    font-weight: 500;
+    color: #475569;
+    font-size: 0.9rem;
 }
 
-.summary-row .value {
-    color: #333;
+.info-value {
+    color: #0f172a;
+    font-weight: 500;
+    font-size: 0.95rem;
 }
 
-.summary-row.highlight .value {
-    color: #007bff;
-    font-size: 18px;
+.highlight-number {
+    font-weight: 700;
+    color: #3b82f6;
+    background: #eff6ff;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.9rem;
 }
 
-.action-buttons {
+.highlight-row {
+    background: #fefce8;
+    margin-top: 6px;
+    padding: 12px 0;
+    border-radius: 8px;
+    border-bottom: none;
+}
+
+.total-value {
+    font-weight: 800;
+    font-size: 1.2rem;
+    color: #16a34a;
+}
+
+/* Products Section */
+.products-section {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    overflow-x: auto;
+    margin-bottom: 30px;
+    border: 1px solid #e2e8f0;
+}
+
+.section-header {
     display: flex;
-    gap: 15px;
-    justify-content: center;
-    animation: fadeInUp 0.5s ease-out 0.3s both;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 2px solid #e2e8f0;
+    background: #fafcff;
 }
 
+.section-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.selection-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* Data Table */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.data-table th {
+    background: #f8fafc;
+    padding: 14px 16px;
+    text-align: left;
+    font-weight: 600;
+    color: #334155;
+    border-bottom: 2px solid #e2e8f0;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.data-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #1e293b;
+}
+
+.data-table tbody tr:hover {
+    background: #f8fafc;
+    transition: background 0.15s ease;
+}
+
+.loading-cell {
+    text-align: center;
+    padding: 48px !important;
+    color: #94a3b8;
+    font-style: italic;
+}
+
+.table-footer {
+    background: #f8fafc;
+    font-weight: 600;
+    border-top: 2px solid #e2e8f0;
+}
+
+.table-footer td {
+    padding: 12px 16px;
+    font-size: 0.95rem;
+}
+
+/* Action Bar */
+.action-bar {
+    display: flex;
+    gap: 16px;
+    justify-content: flex-end;
+    padding: 8px 0 20px 0;
+    flex-wrap: wrap;
+}
+
+/* Button Styles (Matches Edit Page) */
 .btn-primary {
-    background: #007bff;
+    background: #3b82f6;
     color: white;
-    padding: 12px 24px;
+    padding: 10px 24px;
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
     text-decoration: none;
-    display: inline-block;
-    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
 }
 
 .btn-primary:hover {
-    background: #0056b3;
-}
-
-.btn-secondary {
-    background: #6c757d;
-    color: white;
-    padding: 12px 24px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-block;
-    font-size: 14px;
-}
-
-.btn-secondary:hover {
-    background: #5a6268;
+    background: #2563eb;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(59,130,246,0.3);
 }
 
 .btn-success {
-    background: #28a745;
+    background: #22c55e;
     color: white;
-    padding: 12px 24px;
+    padding: 10px 24px;
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
     text-decoration: none;
-    display: inline-block;
-    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
 }
 
 .btn-success:hover {
-    background: #218838;
+    background: #16a34a;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(34,197,94,0.3);
+}
+
+.btn-secondary {
+    background: #64748b;
+    color: white;
+    padding: 10px 24px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+    background: #475569;
+    transform: translateY(-1px);
+}
+
+.btn-sm {
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    border-radius: 6px;
 }
 
 /* Loading Overlay */
 #loading-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    z-index: 9999;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(3px);
     display: flex;
     justify-content: center;
     align-items: center;
+    z-index: 9999;
 }
 
 .spinner {
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #007bff;
+    width: 48px;
+    height: 48px;
+    border: 4px solid #e2e8f0;
+    border-top: 4px solid #3b82f6;
     border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    animation: spin 1s linear infinite;
+    animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
@@ -255,44 +483,92 @@ h1 {
     100% { transform: rotate(360deg); }
 }
 
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container {
+        padding: 16px;
     }
-    to {
-        opacity: 1;
-        transform: translateY(0);
+    
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .page-header h2 {
+        font-size: 1.4rem;
+    }
+    
+    .restock-info-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .success-status-card {
+        padding: 24px 16px;
+    }
+    
+    .success-status-card h1 {
+        font-size: 1.4rem;
+    }
+    
+    .success-icon {
+        width: 56px;
+        height: 56px;
+        font-size: 34px;
+    }
+    
+    .data-table {
+        font-size: 0.8rem;
+    }
+    
+    .data-table th,
+    .data-table td {
+        padding: 10px 12px;
+    }
+    
+    .action-bar {
+        justify-content: stretch;
+        flex-direction: column;
+    }
+    
+    .action-bar a {
+        justify-content: center;
+    }
+    
+    .btn-primary, .btn-secondary, .btn-success {
+        padding: 10px 16px;
+        width: 100%;
+        justify-content: center;
     }
 }
 
 /* Print Styles */
 @media print {
-    .action-buttons,
-    .btn-primary,
-    .btn-secondary,
-    .btn-success {
-        display: none;
+    .action-bar, .header-actions, .selection-actions, #print-summary-btn, #print-summary-btn-bottom, #new-restock-btn {
+        display: none !important;
     }
     
-    .success-container {
+    .container {
         padding: 0;
+        margin: 0;
     }
     
-    .success-card {
-        break-inside: avoid;
-    }
-}
-
-@media (max-width: 768px) {
-    .action-buttons {
-        flex-direction: column;
+    .success-status-card {
+        background: none;
+        border: 1px solid #ddd;
+        box-shadow: none;
     }
     
-    .action-buttons a {
-        width: 100%;
-        text-align: center;
+    .info-card, .summary-card, .products-section {
+        box-shadow: none;
+        border: 1px solid #ddd;
+        page-break-inside: avoid;
+    }
+    
+    .data-table th {
+        background: #f0f0f0;
     }
 }
 </style>
+
 {% endblock %}

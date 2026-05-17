@@ -172,7 +172,7 @@ class BulkRestockList {
             console.log("[DEBUG] Filter params:", params.toString());
 
             // const url = `/inventory/workflow-bulk-restocks/?${params.toString()}`;
-            const url = `/inventory/workflow-bulk-restocks/my_restocks/?${params.toString()}`;
+            const url = `/inventory/workflow-bulk-restocks/Allrestocks/?${params.toString()}`;
 
             console.log("[DEBUG] Fetch URL:", url);
 

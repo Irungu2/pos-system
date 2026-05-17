@@ -176,12 +176,24 @@ class BulkRestockEditPageView(LoginRequiredMixin, TemplateView):
 
         try:
 
+            # restock = (
+            #     BulkRestock.objects
+            #     .select_related('store', 'completed_by')
+            #     .prefetch_related('items__product')
+            #     .get(id=restock_id)
+            # )
             restock = (
                 BulkRestock.objects
                 .select_related('store', 'completed_by')
                 .prefetch_related('items__product')
                 .get(id=restock_id)
             )
+
+            print(f"[DEBUG] Restock ID: {restock.id}")
+            print(f"[DEBUG] Restock Status: {restock.status}")
+            print(f"[DEBUG] Restock Completed: {restock.completed}")
+            print(f"[DEBUG] Completed By: {restock.completed_by}")
+            print(f"[DEBUG] Items Count: {restock.items.count()}")
 
             if restock.completed:
 
@@ -590,239 +602,6 @@ class BulkRestockReviewPageView(LoginRequiredMixin, TemplateView):
         return context
 
 
-
-# class BulkRestockSuccessPageView(LoginRequiredMixin, TemplateView):
-#     """
-#     Success page after processing
-#     """
-
-#     template_name = "restock/bulk_restock_success.html"
-
-#     def get_context_data(self, **kwargs):
-
-#         print("\n" + "=" * 60)
-#         print("[PAGE VIEW] BulkRestockSuccessPageView - START")
-#         print("=" * 60)
-
-#         context = super().get_context_data(**kwargs)
-
-#         restock_id = self.kwargs['pk']
-
-#         context['restock_id'] = restock_id
-
-#         try:
-
-#             restock = (
-#                 BulkRestock.objects
-#                 .select_related('store', 'completed_by')
-#                 .prefetch_related('items__product')
-#                 .get(id=restock_id)
-#             )
-
-#             print(
-#                 f"[DEBUG] Restock found - "
-#                 f"Status: {restock.status}"
-#             )
-
-#             # ---------------------------------------------------
-#             # SUCCESS CASE
-#             # ---------------------------------------------------
-#             if restock.completed:
-
-#                 print(
-#                     f"[SUCCESS] Restock "
-#                     f"{restock.id} completed"
-#                 )
-
-#                 items = restock.items.select_related('product')
-
-#                 # -----------------------------------------
-#                 # TOTAL QUANTITY ADDED
-#                 # -----------------------------------------
-#                 total_quantity_added = sum(
-#                     item.new_quantity or 0
-#                     for item in items
-#                 )
-
-#                 # -----------------------------------------
-#                 # CURRENT INVENTORY VALUE
-#                 # -----------------------------------------
-#                 total_current_value = sum(
-#                     (item.current_quantity or 0)
-#                     * (item.current_price or 0)
-#                     for item in items
-#                 )
-
-#                 # -----------------------------------------
-#                 # FINAL INVENTORY VALUE
-#                 # -----------------------------------------
-#                 total_final_value = sum(
-#                     (
-#                         (item.current_quantity or 0)
-#                         + (item.new_quantity or 0)
-#                     ) * (
-#                         item.new_price
-#                         or item.current_price
-#                         or 0
-#                     )
-#                     for item in items
-#                 )
-
-#                 # -----------------------------------------
-#                 # VALUE INCREASE
-#                 # -----------------------------------------
-#                 total_value_added = (
-#                     total_final_value
-#                     - total_current_value
-#                 )
-
-#                 # -----------------------------------------
-#                 # FINAL STOCK AFTER RESTOCK
-#                 # -----------------------------------------
-#                 total_final_quantity = sum(
-#                     (item.current_quantity or 0)
-#                     + (item.new_quantity or 0)
-#                     for item in items
-#                 )
-
-#                 print("[DEBUG] Success Summary")
-#                 print(f"  - Items updated: {items.count()}")
-#                 print(f"  - Quantity added: {total_quantity_added}")
-#                 print(f"  - Final quantity: {total_final_quantity}")
-#                 print(f"  - Current value: {total_current_value}")
-#                 print(f"  - Final value: {total_final_value}")
-#                 print(f"  - Value increase: {total_value_added}")
-
-#                 context.update({
-#                     'is_completed': True,
-
-#                     'success_message':
-#                         "Stock update completed successfully!",
-
-#                     'total_items_updated':
-#                         items.count(),
-
-#                     # Quantity added only
-#                     'total_quantity_added':
-#                         total_quantity_added,
-
-#                     # Final quantity after processing
-#                     'total_final_quantity':
-#                         total_final_quantity,
-
-#                     # Inventory values
-#                     'total_current_value':
-#                         total_current_value,
-
-#                     'total_final_value':
-#                         total_final_value,
-
-#                     # Difference
-#                     'total_value_added':
-#                         total_value_added,
-
-#                     'store_name':
-#                         restock.store.name,
-
-#                     'completed_by':
-#                         (
-#                             restock.completed_by.first_name
-#                             if restock.completed_by
-#                             else 'System'
-#                         ),
-
-#                     'completed_at':
-#                         restock.completed_at,
-
-#                     'generated_at':
-#                         restock.generated_at,
-
-#                     'restock_status':
-#                         restock.status,
-#                 })
-
-#             # ---------------------------------------------------
-#             # NOT COMPLETED
-#             # ---------------------------------------------------
-#             else:
-
-#                 print(
-#                     f"[WARNING] Restock "
-#                     f"{restock.id} not completed"
-#                 )
-
-#                 context['is_completed'] = False
-
-#                 context['warning_message'] = (
-#                     "This restock has not "
-#                     "been processed yet."
-#                 )
-
-#                 context['store_name'] = (
-#                     restock.store.name
-#                     if restock.store
-#                     else 'Unknown'
-#                 )
-
-#                 context['restock_status'] = restock.status
-
-#         # ---------------------------------------------------
-#         # NOT FOUND
-#         # ---------------------------------------------------
-#         except BulkRestock.DoesNotExist:
-
-#             print(
-#                 f"[ERROR] Restock "
-#                 f"{restock_id} not found"
-#             )
-
-#             context['is_completed'] = False
-
-#             context['error_message'] = (
-#                 f"Restock {restock_id} not found."
-#             )
-
-#         # ---------------------------------------------------
-#         # GENERAL ERROR
-#         # ---------------------------------------------------
-#         except Exception as e:
-
-#             print(
-#                 f"[ERROR] Exception: {str(e)}"
-#             )
-
-#             import traceback
-#             traceback.print_exc()
-
-#             context['is_completed'] = False
-
-#             context['error_message'] = str(e)
-
-#         # ---------------------------------------------------
-#         # ACTIONS
-#         # ---------------------------------------------------
-#         context['suggested_actions'] = [
-#             {
-#                 'name': 'Create Another Restock',
-#                 'url': '/restock/create/'
-#             },
-#             {
-#                 'name': 'View All Restocks',
-#                 'url': '/restock/'
-#             },
-#             {
-#                 'name': 'View Inventory',
-#                 'url': '/inventory/'
-#             },
-#         ]
-
-#         print(f"[DEBUG] Template: {self.template_name}")
-
-#         print("=" * 60)
-#         print("[PAGE VIEW] BulkRestockSuccessPageView - END")
-#         print("=" * 60 + "\n")
-
-#         return context
 
 class BulkRestockSuccessPageView(LoginRequiredMixin, TemplateView):
     """
@@ -1337,62 +1116,6 @@ class BulkRestockViewSet(viewsets.ModelViewSet):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-
-    # =========================================================
-    # @action(detail=True, methods=['get'])
-    # def summary(self, request, pk=None):
-    #     """
-    #     Get summary of the restock draft
-    #     """
-    #     restock = self.get_object()
-        
-    #     items = restock.items.select_related('product')
-
-    #     summary = {
-    #         'total_items': items.count(),
-    #         'total_current_quantity': sum(i.current_quantity for i in items),
-    #         'total_new_quantity': sum(i.new_quantity for i in items),
-    #         'total_quantity_increase': sum(i.quantity_change for i in items),
-    #         'total_current_value': sum(i.current_quantity * i.current_price for i in items),
-    #         'total_new_value': sum(
-    #             i.new_quantity * (i.new_price or i.current_price)
-    #             for i in items
-    #         ),
-    #         'items_by_category': {}
-    #     }
-
-    #     for item in items:
-    #         cat = item.product.category.name if item.product.category else 'Uncategorized'
-
-    #         if cat not in summary['items_by_category']:
-    #             summary['items_by_category'][cat] = {
-    #                 'count': 0,
-    #                 'quantity_increase': 0,
-    #                 'value_increase': 0
-    #             }
-
-    #         summary['items_by_category'][cat]['count'] += 1
-    #         summary['items_by_category'][cat]['quantity_increase'] += item.quantity_change
-    #         summary['items_by_category'][cat]['value_increase'] += (
-    #             (item.new_quantity or 0) * (item.new_price or item.current_price or 0)
-    #         )
-
-    #     response_data = {
-    #         'restock': BulkRestockDetailSerializer(restock).data,
-    #         'summary': summary
-    #     }
-        
-    #     # ================== DEBUG PRINT ==================
-    #     print("\n" + "="*60)
-    #     print(f"[SUMMARY DEBUG] Restock ID: {pk}")
-    #     print("- Restock Data -")
-    #     print(response_data['restock'])
-    #     print("- Summary Data -")
-    #     print(response_data['summary'])
-    #     print("="*60 + "\n")
-        
-    #     return Response(response_data)
-
     @action(detail=True, methods=['get'])
     def summary(self, request, pk=None):
         """
@@ -1582,44 +1305,66 @@ class BulkRestockViewSet(viewsets.ModelViewSet):
     # =========================================================
     # 10. LIST VIEWS
     # =========================================================
-    @action(detail=False, methods=['get'])
-    def my_restocks(self, request):
-        """
-        Get restocks created by current user
-        """
-        print("\n" + "="*60)
-        print("[LIST] my_restocks - START")
-        print("="*60)
-        
-        print(f"[DEBUG] Filtering restocks for user: {request.user.first_name}")
-        restocks = self.get_queryset().filter(completed_by=request.user)
-        print(f"[DEBUG] Found {restocks.count()} restocks for user")
-        
-        serializer = self.get_serializer(restocks, many=True)
-        print("="*60)
-        print("[LIST] my_restocks - END")
-        print("="*60 + "\n")
-        
-        return Response(serializer.data)
+
+    # @action(detail=False, methods=['get'])
+    # def Allrestocks(self, request):
+    #     """
+    #     Get restocks created by current user with optional status filter
+    #     """
+
+    #     print("\n" + "="*60)
+    #     print("[LIST] my_restocks - START")
+    #     print("="*60)
+
+    #     restocks = self.get_queryset().filter(completed_by=request.user)
+
+    #     status = request.query_params.get("status")
+
+    #     print(f"[DEBUG] Status filter received: {status}")
+
+    #     if status:
+    #         # single status
+    #         restocks = restocks.filter(status=status)
+
+    #     print(f"[DEBUG] Found {restocks.count()} restocks for user")
+
+    #     serializer = self.get_serializer(restocks, many=True)
+
+    #     print("="*60)
+    #     print("[LIST] my_restocks - END")
+    #     print("="*60 + "\n")
+
+    #     return Response(serializer.data)
+
+
 
     @action(detail=False, methods=['get'])
-    def pending_restocks(self, request):
+    def Allrestocks(self, request):
         """
-        Get pending restocks (not completed)
+        Get all restocks with optional status filter
         """
+
         print("\n" + "="*60)
-        print("[LIST] pending_restocks - START")
+        print("[LIST] Allrestocks - START")
         print("="*60)
-        
-        restocks = self.get_queryset().filter(completed=False)
-        print(f"[DEBUG] Found {restocks.count()} pending restocks")
-        
-        for restock in restocks[:5]:  # Show first 5 pending restocks
-            print(f"  - Restock {restock.id}: Status {restock.status}, Store {restock.store.name}")
-        
+
+        # Return all restocks
+        restocks = self.get_queryset()
+
+        status = request.query_params.get("status")
+
+        print(f"[DEBUG] Status filter received: {status}")
+
+        if status:
+            # single status
+            restocks = restocks.filter(status=status)
+
+        print(f"[DEBUG] Found {restocks.count()} restocks")
+
         serializer = self.get_serializer(restocks, many=True)
+
         print("="*60)
-        print("[LIST] pending_restocks - END")
+        print("[LIST] Allrestocks - END")
         print("="*60 + "\n")
-        
+
         return Response(serializer.data)
