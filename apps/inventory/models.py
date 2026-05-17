@@ -477,7 +477,30 @@ class BulkRestock(models.Model):
     @property
     def items_count(self):
         return self.items.count()
-    
+
+    def get_summary(self):
+        items = self.items.all()
+
+        total_quantity_added = sum(i.new_quantity or 0 for i in items)
+
+        total_current_value = sum(
+            (i.current_quantity or 0) * (i.current_price or 0)
+            for i in items
+        )
+
+        total_final_value = sum(
+            ((i.current_quantity or 0) + (i.new_quantity or 0)) *
+            (i.new_price or i.current_price or 0)
+            for i in items
+        )
+
+        return {
+            "total_quantity_added": total_quantity_added,
+            "total_current_value": total_current_value,
+            "total_final_value": total_final_value,
+            "total_value_added": total_final_value - total_current_value,
+        }
+        
 
 class BulkRestockItem(models.Model):
     restock = models.ForeignKey(BulkRestock, on_delete=models.CASCADE, related_name="items")
@@ -496,3 +519,4 @@ class BulkRestockItem(models.Model):
     @property
     def quantity_change(self):
         return self.new_quantity - self.current_quantity
+

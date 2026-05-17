@@ -4,7 +4,7 @@
 {% block title %}Review Bulk Restock #{{ restock_id }}{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container" data-restock-id="{{ restock_id }}">
     <div class="page-header">
         <h2>Review Bulk Restock #{{ restock_id }}</h2>
         <div class="header-actions">
@@ -55,7 +55,7 @@
                 <span id="updated-date" class="info-value">Loading...</span>
             </div>
         </div>
-        
+
         <div class="summary-card">
             <h3>Order Summary</h3>
             <div class="info-row">
@@ -117,15 +117,15 @@
                         <td colspan="11" class="loading">Loading items...</td>
                     </tr>
                 </tbody>
-                <tfoot id="review-items-footer" style="display: none;">
+                <tfoot>
                     <tr class="table-footer">
                         <td colspan="4"><strong>Totals</strong></td>
                         <td id="footer-total-qty"><strong>0</strong></td>
                         <td><strong>—</strong></td>
                         <td colspan="2"></td>
-                        <td id="footer-current-total"><strong>$0.00</strong></td>
-                        <td id="footer-new-total"><strong>$0.00</strong></td>
-                        <td id="footer-difference"><strong>$0.00</strong></td>
+                        <td id="footer-current-total"><strong>Ksh. 0.00</strong></td>
+                        <td id="footer-new-total"><strong>Ksh. 0.00</strong></td>
+                        <td id="footer-difference"><strong>Ksh. 0.00</strong></td>
                     </tr>
                 </tfoot>
             </table>
@@ -138,7 +138,7 @@
             ← Back to Edit
         </button>
         <button id="confirm-review-btn" class="btn-primary">
-            Submit for Review →
+            Submit  →
         </button>
         <button id="cancel-btn" class="btn-danger">
             Cancel
@@ -151,7 +151,8 @@
     <div class="spinner"></div>
 </div>
 
-<script src="{% static 'js/restock/bulk_restock_review1.js' %}"></script>
+<!-- JS -->
+<script src="{% static 'js/restock/bulk_restock_review4.js' %}"></script>
 
 <style>
 /* General Styles */

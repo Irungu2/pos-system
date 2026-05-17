@@ -232,10 +232,95 @@ class BulkRestockService:
         )
 
 
+    # @staticmethod
+    # @transaction.atomic
+    # def process_restock(restock_id: int, user) -> BulkRestock:
+    #     """Process the restock and update actual stock"""
+    #     print(f"[BulkRestockService] Processing restock_id={restock_id}")
+
+    #     restock = BulkRestock.objects.prefetch_related(
+    #         'items__product'
+    #     ).get(id=restock_id)
+
+    #     if restock.status != 'reviewed':
+    #         print(f"[BulkRestockService] Invalid status={restock.status}")
+    #         raise ValueError(
+    #             f"Cannot process restock when status is {restock.status}"
+    #         )
+
+    #     restock.status = 'processing'
+    #     restock.save(update_fields=['status'])
+
+    #     print(f"[BulkRestockService] Restock {restock.id} status changed to processing")
+
+    #     try:
+    #         for item in restock.items.all():
+    #             print(f"[BulkRestockService] Processing item_id={item.id}")
+
+    #             # -----------------------------
+    #             # STOCK UPDATE (via service)
+    #             # -----------------------------
+    #             if item.new_quantity != item.current_quantity:
+
+    #                 StoreStockService.adjust_stock(
+    #                     product=item.product,
+    #                     store=restock.store,
+    #                     action="add",
+    #                     quantity=item.new_quantity,
+    #                     user=user,
+    #                     reference=f"BULK_RESTOCK_{restock.id}",
+    #                     remarks=restock.notes or "Bulk restock operation"
+    #                 )
+
+    #                 print(
+    #                     f"[BulkRestockService] Stock adjusted for product_id={item.product.id}"
+    #                 )
+
+    #             # -----------------------------
+    #             # PRICE UPDATE
+    #             # -----------------------------
+    #             if item.new_price and item.new_price != item.current_price:
+    #                 print(
+    #                     f"[BulkRestockService] Updating product price "
+    #                     f"{item.current_price} -> {item.new_price}"
+    #                 )
+
+    #                 item.product.selling_price = item.new_price
+    #                 item.product.save(update_fields=['selling_price'])
+
+    #         # -----------------------------
+    #         # MARK COMPLETED
+    #         # -----------------------------
+    #         restock.status = 'completed'
+    #         restock.completed = True
+    #         restock.completed_at = timezone.now()
+    #         restock.completed_by = user
+
+    #         restock.save(update_fields=[
+    #             'status',
+    #             'completed',
+    #             'completed_at',
+    #             'completed_by'
+    #         ])
+
+    #         print(f"[BulkRestockService] Restock {restock.id} completed successfully")
+
+    #     except Exception as e:
+    #         print(f"[BulkRestockService] Error processing restock: {str(e)}")
+
+    #         # rollback status
+    #         restock.status = 'reviewed'
+    #         restock.save(update_fields=['status'])
+
+    #         raise e
+
+    #     return restock
+
     @staticmethod
     @transaction.atomic
     def process_restock(restock_id: int, user) -> BulkRestock:
         """Process the restock and update actual stock"""
+
         print(f"[BulkRestockService] Processing restock_id={restock_id}")
 
         restock = BulkRestock.objects.prefetch_related(
@@ -244,23 +329,45 @@ class BulkRestockService:
 
         if restock.status != 'reviewed':
             print(f"[BulkRestockService] Invalid status={restock.status}")
+
             raise ValueError(
                 f"Cannot process restock when status is {restock.status}"
             )
 
+        # -----------------------------
+        # MOVE TO PROCESSING
+        # -----------------------------
         restock.status = 'processing'
         restock.save(update_fields=['status'])
 
-        print(f"[BulkRestockService] Restock {restock.id} status changed to processing")
+        print(
+            f"[BulkRestockService] Restock {restock.id} "
+            f"status changed to processing"
+        )
 
         try:
-            for item in restock.items.all():
-                print(f"[BulkRestockService] Processing item_id={item.id}")
 
-                # -----------------------------
-                # STOCK UPDATE (via service)
-                # -----------------------------
-                if item.new_quantity != item.current_quantity:
+            for item in restock.items.all():
+
+                print(
+                    f"[BulkRestockService] Processing item_id={item.id}"
+                )
+
+                # =====================================================
+                # STOCK ADDITION
+                # =====================================================
+                # new_quantity means:
+                # QUANTITY TO ADD
+                # NOT final stock quantity
+                # =====================================================
+
+                if item.new_quantity and item.new_quantity > 0:
+
+                    print(
+                        f"[BulkRestockService] Adding stock: "
+                        f"{item.new_quantity} units "
+                        f"to product_id={item.product.id}"
+                    )
 
                     StoreStockService.adjust_stock(
                         product=item.product,
@@ -273,24 +380,39 @@ class BulkRestockService:
                     )
 
                     print(
-                        f"[BulkRestockService] Stock adjusted for product_id={item.product.id}"
+                        f"[BulkRestockService] "
+                        f"Stock updated successfully"
                     )
 
-                # -----------------------------
+                # =====================================================
                 # PRICE UPDATE
-                # -----------------------------
-                if item.new_price and item.new_price != item.current_price:
+                # =====================================================
+
+                if (
+                    item.new_price is not None and
+                    item.new_price != item.current_price
+                ):
+
                     print(
-                        f"[BulkRestockService] Updating product price "
+                        f"[BulkRestockService] Updating price "
                         f"{item.current_price} -> {item.new_price}"
                     )
 
                     item.product.selling_price = item.new_price
-                    item.product.save(update_fields=['selling_price'])
 
-            # -----------------------------
+                    item.product.save(
+                        update_fields=['selling_price']
+                    )
+
+                    print(
+                        f"[BulkRestockService] "
+                        f"Price updated successfully"
+                    )
+
+            # =====================================================
             # MARK COMPLETED
-            # -----------------------------
+            # =====================================================
+
             restock.status = 'completed'
             restock.completed = True
             restock.completed_at = timezone.now()
@@ -303,13 +425,21 @@ class BulkRestockService:
                 'completed_by'
             ])
 
-            print(f"[BulkRestockService] Restock {restock.id} completed successfully")
+            print(
+                f"[BulkRestockService] "
+                f"Restock {restock.id} completed successfully"
+            )
 
         except Exception as e:
-            print(f"[BulkRestockService] Error processing restock: {str(e)}")
+
+            print(
+                f"[BulkRestockService] "
+                f"Error processing restock: {str(e)}"
+            )
 
             # rollback status
             restock.status = 'reviewed'
+
             restock.save(update_fields=['status'])
 
             raise e
@@ -394,4 +524,4 @@ class BulkRestockService:
             'page': page,
             'page_size': page_size,
             'total_pages': paginator.num_pages
-        }
+        } 

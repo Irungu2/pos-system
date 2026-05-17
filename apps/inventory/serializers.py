@@ -431,15 +431,6 @@ from rest_framework import serializers
 from .models import BulkRestock, BulkRestockItem, Product, StoreStock
 from decimal import Decimal
 
-# class BulkRestockItemCreateSerializer(serializers.Serializer):
-#     """Serializer for creating/updating bulk restock items"""
-#     product_id = serializers.IntegerField()
-#     current_quantity = serializers.IntegerField(read_only=True)
-#     current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-#     new_quantity = serializers.IntegerField(required=False, allow_null=True)
-#     new_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
-
-
 class BulkRestockItemCreateSerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
     quantity = serializers.IntegerField(required=False, allow_null=True)
@@ -451,129 +442,235 @@ class BulkRestockItemCreateSerializer(serializers.Serializer):
     )
 
 
-
 # class BulkRestockItemUpdateSerializer(serializers.ModelSerializer):
 #     """Serializer for updating individual items during editing phase"""
+
 #     class Meta:
 #         model = BulkRestockItem
 #         fields = ['id', 'new_quantity', 'new_price']
-    
+
 #     def validate_new_quantity(self, value):
 #         if value is not None and value < 0:
 #             raise serializers.ValidationError("Quantity cannot be negative")
 #         return value
-    
+
 #     def validate_new_price(self, value):
 #         if value is not None and value < 0:
 #             raise serializers.ValidationError("Price cannot be negative")
 #         return value
 
 # class BulkRestockItemResponseSerializer(serializers.ModelSerializer):
-#     """Full item response with computed fields"""
+#     """Clean item response for bulk restock"""
+
 #     product_name = serializers.CharField(source='product.name', read_only=True)
 #     product_sku = serializers.CharField(source='product.sku', read_only=True)
 #     product_category = serializers.CharField(source='product.category.name', read_only=True)
-#     quantity_change = serializers.IntegerField(read_only=True)
+
+#     quantity_added = serializers.SerializerMethodField()
 #     price_change = serializers.SerializerMethodField()
 #     total_cost_increase = serializers.SerializerMethodField()
-    
+
 #     class Meta:
 #         model = BulkRestockItem
 #         fields = [
-#             'id', 'product', 'product_name', 'product_sku', 'product_category',
-#             'current_quantity', 'new_quantity', 'quantity_change',
-#             'current_price', 'new_price', 'price_change', 'total_cost_increase'
+#             'id',
+#             'product',
+#             'product_name',
+#             'product_sku',
+#             'product_category',
+
+#             'current_quantity',
+#             'new_quantity',
+#             'quantity_added',
+
+#             'current_price',
+#             'new_price',
+#             'price_change',
+#             'total_cost_increase',
 #         ]
-#         read_only_fields = ['id']
-    
+
+#     # ----------------------------
+#     # Quantity added (delta)
+#     # ----------------------------
+#     def get_quantity_added(self, obj):
+#         return obj.new_quantity or 0
+
+#     # ----------------------------
+#     # Price difference
+#     # ----------------------------
 #     def get_price_change(self, obj):
-#         if obj.new_price and obj.current_price:
-#             return float(obj.new_price - obj.current_price)
-#         return 0
-    
+#         if obj.new_price is None or obj.current_price is None:
+#             return 0
+#         return float(obj.new_price - obj.current_price)
+
+#     # ----------------------------
+#     # Total impact value
+#     # ----------------------------
 #     def get_total_cost_increase(self, obj):
-#         if obj.new_quantity and obj.new_price and obj.current_quantity and obj.current_price:
-#             new_total = obj.new_quantity * obj.new_price
-#             current_total = obj.current_quantity * obj.current_price
-#             return float(new_total - current_total)
-#         return 0
+#         qty = obj.new_quantity or 0
+#         price = obj.new_price or obj.current_price or 0
+#         return float(qty * price)
+
+
+# class BulkRestockDetailSerializer(serializers.ModelSerializer):
+#     """Clean bulk restock serializer"""
+
+#     items = BulkRestockItemResponseSerializer(many=True, read_only=True)
+
+#     store_name = serializers.CharField(source='store.name', read_only=True)
+#     category_name = serializers.CharField(source='category.name', read_only=True)
+#     completed_by_name = serializers.CharField(source='completed_by.get_full_name', read_only=True)
+
+#     total_items = serializers.IntegerField(source='items.count', read_only=True)
+
+#     total_quantity_added = serializers.SerializerMethodField()
+#     total_value_added = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = BulkRestock
+#         fields = [
+#             'id',
+#             'store',
+#             'store_name',
+#             'category',
+#             'category_name',
+#             'include_all',
+#             'status',
+#             'generated_at',
+#             'completed',
+#             'completed_at',
+#             'completed_by',
+#             'completed_by_name',
+#             'notes',
+
+#             'total_items',
+#             'items',
+
+#             'total_quantity_added',
+#             'total_value_added',
+#         ]
+
+#     # ----------------------------
+#     # Total quantity added
+#     # ----------------------------
+#     def get_total_quantity_added(self, obj):
+#         return sum(item.new_quantity or 0 for item in obj.items.all())
+
+#     # ----------------------------
+#     # Total value added
+#     # ----------------------------
+#     def get_total_value_added(self, obj):
+#         return sum(
+#             (item.new_quantity or 0) *
+#             (item.new_price or item.current_price or 0)
+#             for item in obj.items.all()
+#         )
+
 class BulkRestockItemUpdateSerializer(serializers.ModelSerializer):
     """Serializer for updating individual items during editing phase"""
+
     class Meta:
         model = BulkRestockItem
         fields = ['id', 'new_quantity', 'new_price']
-    
+
     def validate_new_quantity(self, value):
-        print(f"Validating new_quantity: {value}")  # Debug print
         if value is not None and value < 0:
             raise serializers.ValidationError("Quantity cannot be negative")
         return value
-    
+
     def validate_new_price(self, value):
-        print(f"Validating new_price: {value}")  # Debug print
         if value is not None and value < 0:
             raise serializers.ValidationError("Price cannot be negative")
         return value
 
 class BulkRestockItemResponseSerializer(serializers.ModelSerializer):
-    """Full item response with computed fields"""
+    """Clean item response for bulk restock"""
+
     product_name = serializers.CharField(source='product.name', read_only=True)
     product_sku = serializers.CharField(source='product.sku', read_only=True)
     product_category = serializers.CharField(source='product.category.name', read_only=True)
-    quantity_change = serializers.SerializerMethodField()
+
+    quantity_change = serializers.IntegerField(read_only=True)
+
     price_change = serializers.SerializerMethodField()
     total_cost_increase = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = BulkRestockItem
         fields = [
-            'id', 'product', 'product_name', 'product_sku', 'product_category',
-            'current_quantity', 'new_quantity', 'quantity_change',
-            'current_price', 'new_price', 'price_change', 'total_cost_increase'
+            'id',
+            'product',
+            'product_name',
+            'product_sku',
+            'product_category',
+
+            'current_quantity',
+            'new_quantity',
+            'quantity_change',
+
+            'current_price',
+            'new_price',
+            'price_change',
+            'total_cost_increase',
         ]
-        read_only_fields = ['id']
-    
-    def get_quantity_change(self, obj):
-        # Draft quantity is what user requested
-        return obj.new_quantity or 0
-    
+
     def get_price_change(self, obj):
-        if obj.new_price is not None and obj.current_price is not None:
-            return float(obj.new_price - obj.current_price)
-        return 0
-    
+        if obj.new_price is None or obj.current_price is None:
+            return 0
+        return float(obj.new_price - obj.current_price)
+
     def get_total_cost_increase(self, obj):
-        return float((obj.new_quantity or 0) * (obj.new_price or obj.current_price or 0))
+        qty = obj.new_quantity or 0
+        price = obj.new_price or obj.current_price or 0
+        return float(qty * price)
 
 
 class BulkRestockDetailSerializer(serializers.ModelSerializer):
-    """Detailed serializer for bulk restock including items"""
+    """Clean bulk restock serializer"""
+
     items = BulkRestockItemResponseSerializer(many=True, read_only=True)
+
     store_name = serializers.CharField(source='store.name', read_only=True)
     category_name = serializers.CharField(source='category.name', read_only=True)
     completed_by_name = serializers.CharField(source='completed_by.get_full_name', read_only=True)
-    total_items = serializers.IntegerField(source='items_count', read_only=True)
-    total_quantity_increase = serializers.SerializerMethodField()
-    total_value_increase = serializers.SerializerMethodField()
-    
+
+    total_items = serializers.IntegerField(source='items.count', read_only=True)
+
+    total_quantity_added = serializers.SerializerMethodField()
+    total_value_added = serializers.SerializerMethodField()
+
     class Meta:
         model = BulkRestock
         fields = [
-            'id', 'store', 'store_name', 'category', 'category_name',
-            'include_all', 'status', 'generated_at', 'completed', 'completed_at',
-            'completed_by', 'completed_by_name', 'notes', 'total_items',
-            'items', 'total_quantity_increase', 'total_value_increase'
+            'id',
+            'store',
+            'store_name',
+            'category',
+            'category_name',
+            'include_all',
+            'status',
+            'generated_at',
+            'completed',
+            'completed_at',
+            'completed_by',
+            'completed_by_name',
+            'notes',
+
+            'total_items',
+            'items',
+
+            'total_quantity_added',
+            'total_value_added',
         ]
-        read_only_fields = ['id', 'generated_at', 'completed', 'completed_at', 'total_items']
-    
-    def get_total_quantity_increase(self, obj):
-        return sum(item.new_quantity or 0 for item in obj.items.all())
-    
-    def get_total_value_increase(self, obj):
-        return sum(
-            (item.new_quantity or 0) * (item.new_price or item.current_price or 0)
-            for item in obj.items.all()
-        )
+
+    # ✅ SINGLE SOURCE OF TRUTH
+    def get_total_quantity_added(self, obj):
+        return obj.get_summary()["total_quantity_added"]
+
+    def get_total_value_added(self, obj):
+        return obj.get_summary()["total_value_added"]
+        
+
 
 class BulkRestockCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating a bulk restock draft"""
