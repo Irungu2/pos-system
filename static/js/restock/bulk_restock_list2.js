@@ -357,6 +357,8 @@ class BulkRestockList {
         const baseUrl = `/inventory/workflow-bulk-restocks/${restock.id}`;
         
         switch(restock.status) {
+            case 'editing':
+                return `<a href="${baseUrl}/edit/" class="btn-sm">Edit</a>`;
             case 'draft':
                 return `<a href="${baseUrl}/edit/" class="btn-sm">Edit</a>`;
             case 'reviewed':
